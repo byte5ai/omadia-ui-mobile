@@ -29,13 +29,14 @@ type ReactNativeWebSocketConstructor = new (
 const ReactNativeWebSocket = WebSocket as unknown as ReactNativeWebSocketConstructor;
 
 const createWebSocket: WebSocketFactory = (url, headers) => {
-  const cookieLen = headers?.Cookie?.length ?? 0;
-  console.log(`[ws] connect ${url} cookie=${cookieLen > 0 ? `yes(${cookieLen} chars)` : 'no'}`);
-  return new ReactNativeWebSocket(
-    url,
-    null,
-    headers ? { headers } : undefined,
-  ) as unknown as WsLike;
+  // React Native attaches the `omadia_session` cookie automatically from the
+  // native cookie store (populated by the login fetch) on both iOS and Android.
+  // Passing an explicit `Cookie` header here in ADDITION duplicates it, yielding
+  // a malformed double-cookie header that the server rejects with 401. So we
+  // deliberately drop the header and let the native store carry the session.
+  void headers;
+  console.log(`[ws] connect ${url} (cookie via native store)`);
+  return new ReactNativeWebSocket(url, null) as unknown as WsLike;
 };
 
 export function createCanvasConnection(
