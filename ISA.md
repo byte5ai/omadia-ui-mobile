@@ -2,11 +2,11 @@
 task: omadia-ui-mobile — React-Native-Host (iOS first class) für das Omadia-Canvas-Protokoll
 project: omadia-ui-mobile
 effort: E3
-phase: build
-progress: 31/35
+phase: complete
+progress: 35/35
 mode: build
 started: 2026-06-11T10:02:00+02:00
-updated: 2026-06-11T10:02:00+02:00
+updated: 2026-06-11T10:25:00+02:00
 ---
 
 ## Problem
@@ -68,10 +68,10 @@ Lauffähiges Workspace-Repo `~/sources/omadia-ui-mobile`: `canvas-core` mit port
 - [x] ISC-26: Gesamte Test-Suite exit 0 (`bun run test`)
 - [x] ISC-27: Expo-App (TypeScript) unter apps/mobile scaffolded
 - [x] ISC-28: apps/mobile konsumiert @omadia/canvas-core als workspace-Dependency
-- [ ] ISC-29: PrimitiveNode.native rendert alle 11 Primitive-Typen (container, pane, tabs, heading, text, table, list, toolbar, button, status, divider)
-- [ ] ISC-30: App-Shell verbindet CanvasSocket mit RN-WebSocket-Factory + Storage-Adapter
-- [ ] ISC-31: Typecheck der Mobile-App clean
-- [ ] ISC-32: Minimaler Server-URL-Eingabe-Screen (Onboarding) vorhanden
+- [x] ISC-29: PrimitiveNode.native rendert alle 11 Primitive-Typen (container, pane, tabs, heading, text, table, list, toolbar, button, status, divider)
+- [x] ISC-30: App-Shell verbindet CanvasSocket mit RN-WebSocket-Factory + Storage-Adapter
+- [x] ISC-31: Typecheck der Mobile-App clean
+- [x] ISC-32: Minimaler Server-URL-Eingabe-Screen (Onboarding) vorhanden
 - [x] ISC-33: Anti: omadia-ui-Repo unverändert (git status clean)
 - [x] ISC-34: Anti: kein npm/npx-Aufruf in Scripts oder Setup
 - [x] ISC-35: Anti: keine Worktrees angelegt
@@ -104,3 +104,20 @@ Lauffähiges Workspace-Repo `~/sources/omadia-ui-mobile`: `canvas-core` mit port
 - 2026-06-11 10:02 — Eigenes Root-Repo statt Monorepo-Erweiterung (explizite Vorgabe Marcel). canvas-core lebt hier; Rückkonsum durch Electron-App später via Package-Publish oder Repo-Move. Schemas dupliziert — Quelle bleibt omadia-ui/docs, Sync-Pflicht im README.
 - 2026-06-11 10:02 — CanvasSocket auf Standard-WebSocket-Handler-API (onmessage/onclose/onerror) mit injizierter Factory umgestellt: läuft mit RN-WebSocket nativ und mit `ws` unter Node — Core bleibt plattformneutral.
 - 2026-06-11 10:02 — ApertureOscillation aus dem Plan-Lauf dieser Session übernommen (MVP-Schnitt, Prebuild-Pfad, Capability-Hints später) statt erneut zu invoken — identisches Designproblem, frisches Ergebnis.
+
+## Verification
+
+- ISC-1–5: ls/git — Repo, Workspace, .gitignore, README, ISA vorhanden (Bash-Probes, Session 2026-06-11)
+- ISC-6–18: cp+sed-Port, Greps: kein `ws`-/`node:`-/ipc-Import in core/src; 6 Schemas gelistet
+- ISC-15: `bun run gen` → "wrote …validators.generated.mjs (1 runtime helper import(s))"
+- ISC-19: `bunx tsc --noEmit` canvas-core → exit 0
+- ISC-20–26: `bunx vitest run` → "Test Files 6 passed (6), Tests 31 passed (31)"
+- ISC-27/28: create-expo-app Scaffold + `workspace:*`-Dependency, bun install 860 packages
+- ISC-29: 11 eindeutige `case`-Zweige in PrimitiveNode.tsx (rg | sort -u | wc -l = 11) + default-Fallback
+- ISC-30: Greps App.tsx — createCanvasConnection, AppState-Listener, resync() on foreground
+- ISC-31: `bunx tsc --noEmit` apps/mobile → exit 0 (eigener Lauf, nicht nur Forge)
+- ISC-32: Onboarding TextInput + Connect in App.tsx (rg-Treffer)
+- ISC-33: `git status --porcelain` in omadia-ui → leer
+- ISC-34: rg "npm |npx " über alle package.json/README → keine Treffer
+- ISC-35: `git worktree list` → nur main
+- KNOWN GAP (bewusst, Advisor-Option b): Runtime-Smoke-Test der App (Metro/Simulator gegen Stub-Server) steht aus — Follow-up: `bun tools/stubServer.ts` + `bunx expo start --ios`
