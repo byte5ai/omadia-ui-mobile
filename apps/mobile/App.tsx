@@ -38,7 +38,7 @@ import {
   type CanvasConnection,
 } from './src/connection';
 import {
-  fetchProviders,
+  discoverProviders,
   httpOriginFromWs,
   loginWithPassword,
 } from './src/auth';
@@ -106,6 +106,9 @@ export default function App(): React.JSX.Element {
   }, [canvasState]);
 
   const handleStatus = useCallback((nextStatus: ConnectionStatus) => {
+    console.log(
+      `[canvas] status=${nextStatus.state}${nextStatus.detail ? ` detail=${nextStatus.detail}` : ''}`,
+    );
     setStatus(nextStatus);
   }, []);
 
@@ -154,8 +157,8 @@ export default function App(): React.JSX.Element {
         connectToServer(serverUrl);
         return;
       }
-      const providers = await fetchProviders(origin);
-      const passwordProvider = providers?.find((p) => p.kind === 'password');
+      const discovery = await discoverProviders(origin);
+      const passwordProvider = discovery?.providers.find((p) => p.kind === 'password');
       if (passwordProvider) {
         setProviderId(passwordProvider.id);
         setAuthError(null);
@@ -248,10 +251,13 @@ export default function App(): React.JSX.Element {
         password,
       );
       cookieRef.current = cookie;
+      console.log(`[auth] login ok, cookie acquired (provider=${providerId})`);
       setPassword('');
       connectToServer(serverUrl);
     } catch (err) {
-      setAuthError(err instanceof Error ? err.message : 'Login fehlgeschlagen.');
+      const message = err instanceof Error ? err.message : 'Login fehlgeschlagen.';
+      console.log(`[auth] login failed: ${message}`);
+      setAuthError(message);
     } finally {
       setAuthBusy(false);
     }

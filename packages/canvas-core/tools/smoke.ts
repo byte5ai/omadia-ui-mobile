@@ -44,7 +44,7 @@ async function login(wsUrl: string): Promise<string> {
   const res = await fetch(`${httpOrigin(wsUrl)}/api/v1/auth/login/local`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email: user, username: user, password: pass }),
+    body: JSON.stringify({ email: user.trim().toLowerCase(), password: pass }),
   });
   if (!res.ok) throw new Error(`login failed: ${res.status} ${await res.text()}`);
   const setCookie = res.headers.getSetCookie?.().join('; ') ?? res.headers.get('set-cookie') ?? '';
