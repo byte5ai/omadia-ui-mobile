@@ -3,9 +3,14 @@
   "version": "0.1.0",
   "main": "index.ts",
   "dependencies": {
+    "@expo-google-fonts/geist": "^0.4.2",
+    "@expo-google-fonts/geist-mono": "^0.4.2",
+    "@expo-google-fonts/source-serif-4": "^0.4.1",
     "@omadia/canvas-core": "workspace:*",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "expo": "~56.0.11",
+    "expo-font": "^56.0.6",
+    "expo-linear-gradient": "^56.0.4",
     "expo-status-bar": "~56.0.4",
     "react": "19.2.3",
     "react-native": "0.85.3"

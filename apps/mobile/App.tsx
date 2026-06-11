@@ -14,9 +14,12 @@ import {
   SafeAreaView,
   ScrollView,
   StyleSheet,
+  type StyleProp,
   Text,
+  type TextStyle,
   TextInput,
   View,
+  type ViewStyle,
 } from 'react-native';
 import {
   applyServerMessage,
@@ -27,6 +30,17 @@ import {
   type ConnectionStatus,
   type ServerMessage,
 } from '@omadia/canvas-core';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  useFonts,
+  Geist_400Regular,
+  Geist_600SemiBold,
+} from '@expo-google-fonts/geist';
+import {
+  GeistMono_400Regular,
+  GeistMono_500Medium,
+} from '@expo-google-fonts/geist-mono';
+import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4';
 
 import PrimitiveNode, { type PrimitiveJson } from './src/render/PrimitiveNode';
 import {
@@ -43,17 +57,19 @@ import {
   httpOriginFromWs,
   loginWithPassword,
 } from './src/auth';
+import {
+  Surface,
+  containerTitle,
+  heading,
+  lume,
+  mono,
+  prose,
+  text as textPreset,
+  textSecondary,
+  textTertiary,
+} from './src/theme/lume';
 
 type Screen = 'url' | 'login' | 'canvas';
-
-const palette = {
-  bg: '#0f1115',
-  surface: '#1a1d24',
-  border: '#2a2f3a',
-  text: '#e6e8eb',
-  muted: '#9aa3af',
-  accent: '#4f8cff',
-};
 
 /** Prefilled connection target — mirrors the desktop onboarding default and the
  *  local test middleware (Docker omadia-test on :8080). */
@@ -76,7 +92,55 @@ const isPrimitiveNode = (value: unknown): value is PrimitiveJson =>
 const canvasColorHex = (color: number): string =>
   `#${(color & 0xffffff).toString(16).padStart(6, '0')}`;
 
+type PrimaryButtonProps = {
+  disabled?: boolean;
+  label: string;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+  textStyle?: StyleProp<TextStyle>;
+};
+
+function PrimaryButton({
+  disabled = false,
+  label,
+  onPress,
+  style,
+  textStyle,
+}: PrimaryButtonProps): React.JSX.Element {
+  return (
+    <Pressable
+      disabled={disabled}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        styles.primaryButtonShadow,
+        disabled ? styles.disabledButton : null,
+        pressed && !disabled ? styles.primaryButtonPressed : null,
+        style,
+      ]}
+    >
+      <LinearGradient
+        colors={[...lume.gradients.accentFill] as const}
+        end={{ x: 0, y: 1 }}
+        start={{ x: 0, y: 0 }}
+        style={styles.primaryButtonFill}
+      >
+        <Text style={[textPreset, styles.primaryButtonLabel, textStyle]}>
+          {label}
+        </Text>
+      </LinearGradient>
+    </Pressable>
+  );
+}
+
 export default function App(): React.JSX.Element {
+  const [fontsLoaded] = useFonts({
+    Geist_400Regular,
+    Geist_600SemiBold,
+    GeistMono_400Regular,
+    GeistMono_500Medium,
+    SourceSerif4_400Regular,
+  });
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [booting, setBooting] = useState(true);
   const [screen, setScreen] = useState<Screen>('url');
@@ -348,12 +412,14 @@ export default function App(): React.JSX.Element {
     connectionRef.current?.sendTurn(turn);
   }, []);
 
-  if (booting) {
+  if (booting || !fontsLoaded) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.centered}>
-          <Text style={styles.bootText}>Loading canvas…</Text>
-        </View>
+        <Surface style={styles.flex} variant="bg">
+          <View style={styles.centered}>
+            <Text style={[textTertiary, styles.bootText]}>Loading canvas…</Text>
+          </View>
+        </Surface>
       </SafeAreaView>
     );
   }
@@ -361,38 +427,40 @@ export default function App(): React.JSX.Element {
   if (screen === 'url') {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.flex}
-        >
-          <View style={styles.onboarding}>
-            <Text style={styles.heroTitle}>Connect to Omadia Canvas</Text>
-            <Text style={styles.heroText}>
-              Enter the websocket endpoint for your canvas session.
-            </Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="url"
-              onChangeText={(value) => {
-                setUrlInput(value);
-                if (validationError) {
-                  setValidationError(null);
-                }
-              }}
-              placeholder="ws(s)://..."
-              placeholderTextColor={palette.muted}
-              style={styles.input}
-              value={urlInput}
-            />
-            {validationError ? (
-              <Text style={styles.errorText}>{validationError}</Text>
-            ) : null}
-            <Pressable style={styles.primaryButton} onPress={() => void handleConnect()}>
-              <Text style={styles.primaryButtonLabel}>Connect</Text>
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
+        <Surface style={styles.flex} variant="bg">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.flex}
+          >
+            <View style={styles.onboarding}>
+              <Surface style={styles.onboardingCard} variant="raised">
+                <Text style={[heading, styles.heroTitle]}>Connect to Omadia Canvas</Text>
+                <Text style={[textSecondary, styles.heroText]}>
+                  Enter the websocket endpoint for your canvas session.
+                </Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  onChangeText={(value) => {
+                    setUrlInput(value);
+                    if (validationError) {
+                      setValidationError(null);
+                    }
+                  }}
+                  placeholder="ws(s)://..."
+                  placeholderTextColor={lume.colors.textTertiary}
+                  style={[styles.input, styles.inputMono]}
+                  value={urlInput}
+                />
+                {validationError ? (
+                  <Text style={styles.errorText}>{validationError}</Text>
+                ) : null}
+                <PrimaryButton label="Connect" onPress={() => void handleConnect()} />
+              </Surface>
+            </View>
+          </KeyboardAvoidingView>
+        </Surface>
       </SafeAreaView>
     );
   }
@@ -400,63 +468,69 @@ export default function App(): React.JSX.Element {
   if (screen === 'login') {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.flex}
-        >
-          <View style={styles.onboarding}>
-            <Text style={styles.heroTitle}>Anmelden</Text>
-            <Text style={styles.heroText}>
-              {settings?.serverUrl ?? ''}
-            </Text>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="username"
-              onChangeText={(value) => {
-                setEmail(value);
-                if (authError) setAuthError(null);
-              }}
-              placeholder="E-Mail"
-              placeholderTextColor={palette.muted}
-              style={styles.input}
-              value={email}
-            />
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              secureTextEntry
-              textContentType="password"
-              onChangeText={(value) => {
-                setPassword(value);
-                if (authError) setAuthError(null);
-              }}
-              onSubmitEditing={() => void handleLogin()}
-              placeholder="Passwort"
-              placeholderTextColor={palette.muted}
-              style={styles.input}
-              value={password}
-            />
-            {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
-            <Pressable
-              disabled={authBusy}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                authBusy && styles.disabledButton,
-                pressed && !authBusy ? styles.primaryButtonPressed : null,
-              ]}
-              onPress={() => void handleLogin()}
-            >
-              <Text style={styles.primaryButtonLabel}>
-                {authBusy ? 'Anmelden…' : 'Sign in'}
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => setScreen('url')}>
-              <Text style={styles.linkText}>← Server ändern</Text>
-            </Pressable>
-          </View>
-        </KeyboardAvoidingView>
+        <Surface style={styles.flex} variant="bg">
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.flex}
+          >
+            <View style={styles.onboarding}>
+              <Surface style={styles.onboardingCard} variant="raised">
+                <Text style={[heading, styles.heroTitle]}>Anmelden</Text>
+                <Text style={[mono, textTertiary, styles.heroText]}>
+                  {settings?.serverUrl ?? ''}
+                </Text>
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  textContentType="username"
+                  onChangeText={(value) => {
+                    setEmail(value);
+                    if (authError) setAuthError(null);
+                  }}
+                  placeholder="E-Mail"
+                  placeholderTextColor={lume.colors.textTertiary}
+                  style={styles.input}
+                  value={email}
+                />
+                <TextInput
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  secureTextEntry
+                  textContentType="password"
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    if (authError) setAuthError(null);
+                  }}
+                  onSubmitEditing={() => void handleLogin()}
+                  placeholder="Passwort"
+                  placeholderTextColor={lume.colors.textTertiary}
+                  style={styles.input}
+                  value={password}
+                />
+                {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
+                <PrimaryButton
+                  disabled={authBusy}
+                  label={authBusy ? 'Anmelden…' : 'Sign in'}
+                  onPress={() => void handleLogin()}
+                />
+                <Pressable onPress={() => setScreen('url')} style={styles.linkButton}>
+                  {({ pressed }) => (
+                    <Text
+                      style={[
+                        textSecondary,
+                        styles.linkText,
+                        pressed ? styles.linkTextPressed : null,
+                      ]}
+                    >
+                      ← Server ändern
+                    </Text>
+                  )}
+                </Pressable>
+              </Surface>
+            </View>
+          </KeyboardAvoidingView>
+        </Surface>
       </SafeAreaView>
     );
   }
@@ -470,126 +544,130 @@ export default function App(): React.JSX.Element {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.flex}
-      >
-        <View style={styles.screen}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Omadia Canvas</Text>
-            <Text style={styles.statusLine}>
-              {status.state}
-              {status.detail ? ` · ${status.detail}` : ''}
-            </Text>
-            {canvasState.turnError ? (
-              <Text style={styles.errorText}>{canvasState.turnError}</Text>
-            ) : null}
-            {canvasState.notices.length > 0 ? (
-              <Text style={styles.noticeText}>{canvasState.notices.join(' · ')}</Text>
-            ) : null}
-          </View>
+      <Surface style={styles.flex} variant="bg">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.flex}
+        >
+          <View style={styles.screen}>
+            <View style={styles.header}>
+              <Text style={[containerTitle, styles.headerTitle]}>Omadia Canvas</Text>
+              <Text style={[mono, textTertiary, styles.statusLine]}>
+                {status.state}
+                {status.detail ? ` · ${status.detail}` : ''}
+              </Text>
+              {canvasState.turnError ? (
+                <Text style={styles.errorText}>{canvasState.turnError}</Text>
+              ) : null}
+              {canvasState.notices.length > 0 ? (
+                <Text style={[mono, textTertiary, styles.noticeText]}>
+                  {canvasState.notices.join(' · ')}
+                </Text>
+              ) : null}
+            </View>
 
-          {canvases.length > 0 ? (
-            <ScrollView
-              contentContainerStyle={styles.canvasSwitcherContent}
-              horizontal
-              keyboardShouldPersistTaps="handled"
-              showsHorizontalScrollIndicator={false}
-              style={styles.canvasSwitcher}
-            >
-              {canvases.map((entry) => {
-                const active = entry.sessionId === activeSessionId;
-                return (
-                  <Pressable
-                    key={entry.sessionId}
-                    onPress={() => openCanvas(entry)}
-                    style={({ pressed }) => [
-                      styles.canvasChip,
-                      active ? styles.canvasChipActive : null,
-                      pressed ? styles.canvasChipPressed : null,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.canvasChipDot,
-                        { backgroundColor: canvasColorHex(entry.color) },
-                      ]}
-                    />
-                    <Text
-                      numberOfLines={1}
-                      style={[
-                        styles.canvasChipLabel,
-                        active ? styles.canvasChipLabelActive : null,
+            {canvases.length > 0 ? (
+              <ScrollView
+                contentContainerStyle={styles.canvasSwitcherContent}
+                horizontal
+                keyboardShouldPersistTaps="handled"
+                showsHorizontalScrollIndicator={false}
+                style={styles.canvasSwitcher}
+              >
+                {canvases.map((entry) => {
+                  const active = entry.sessionId === activeSessionId;
+                  return (
+                    <Pressable
+                      key={entry.sessionId}
+                      onPress={() => openCanvas(entry)}
+                      style={({ pressed }) => [
+                        styles.canvasChipPressable,
+                        pressed ? styles.canvasChipPressed : null,
                       ]}
                     >
-                      {entry.title}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          ) : null}
-
-          <ScrollView
-            contentContainerStyle={styles.canvasContent}
-            keyboardShouldPersistTaps="handled"
-            style={styles.canvasScroll}
-          >
-            {liveTree ? (
-              <PrimitiveNode node={liveTree} onAction={handleAction} />
-            ) : isPrimitiveNode(previewTree) ? (
-              <PrimitiveNode node={previewTree} onAction={handleAction} />
-            ) : (
-              <View style={styles.placeholder}>
-                <Text style={styles.placeholderTitle}>Waiting for canvas…</Text>
-                <Text style={styles.placeholderText}>
-                  Send a prompt or wait for the server to push the first tree.
-                </Text>
-              </View>
-            )}
-            {canvasState.prose ? (
-              <View style={styles.proseCard}>
-                <Text style={styles.proseLabel}>Prose</Text>
-                <Text style={styles.proseText}>{canvasState.prose}</Text>
-              </View>
+                      <Surface
+                        style={[
+                          styles.canvasChip,
+                          active ? styles.canvasChipActive : null,
+                        ]}
+                        variant="raised"
+                      >
+                        <View
+                          style={[
+                            styles.canvasChipDot,
+                            { backgroundColor: canvasColorHex(entry.color) },
+                          ]}
+                        />
+                        <Text
+                          numberOfLines={1}
+                          style={[
+                            mono,
+                            styles.canvasChipLabel,
+                            active ? styles.canvasChipLabelActive : null,
+                          ]}
+                        >
+                          {entry.title}
+                        </Text>
+                      </Surface>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             ) : null}
-          </ScrollView>
 
-          <View style={styles.composer}>
-            <TextInput
-              autoCapitalize="sentences"
-              multiline
-              onChangeText={setPrompt}
-              placeholder="Describe the next change..."
-              placeholderTextColor={palette.muted}
-              style={styles.composerInput}
-              value={prompt}
-            />
-            <Pressable
-              disabled={!prompt.trim() || status.state !== 'ready'}
-              onPress={handleSend}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                (!prompt.trim() || status.state !== 'ready') && styles.disabledButton,
-                pressed && prompt.trim() && status.state === 'ready'
-                  ? styles.primaryButtonPressed
-                  : null,
-              ]}
+            <ScrollView
+              contentContainerStyle={styles.canvasContent}
+              keyboardShouldPersistTaps="handled"
+              style={styles.canvasScroll}
             >
-              <Text style={styles.primaryButtonLabel}>
-                {canvasState.turnPending ? 'Sending…' : 'Send'}
-              </Text>
-            </Pressable>
+              {liveTree ? (
+                <PrimitiveNode node={liveTree} onAction={handleAction} />
+              ) : isPrimitiveNode(previewTree) ? (
+                <PrimitiveNode node={previewTree} onAction={handleAction} />
+              ) : (
+                <Surface style={styles.placeholder} variant="raised">
+                  <Text style={[containerTitle, styles.placeholderTitle]}>
+                    Waiting for canvas…
+                  </Text>
+                  <Text style={[textSecondary, styles.placeholderText]}>
+                    Send a prompt or wait for the server to push the first tree.
+                  </Text>
+                </Surface>
+              )}
+              {canvasState.prose ? (
+                <Surface style={styles.proseCard} variant="raised">
+                  <Text style={[mono, textTertiary, styles.proseLabel]}>Prose</Text>
+                  <Text style={[prose, styles.proseText]}>{canvasState.prose}</Text>
+                </Surface>
+              ) : null}
+            </ScrollView>
+
+            <View style={styles.composer}>
+              <TextInput
+                autoCapitalize="sentences"
+                multiline
+                onChangeText={setPrompt}
+                placeholder="Describe the next change..."
+                placeholderTextColor={lume.colors.textTertiary}
+                style={styles.composerInput}
+                value={prompt}
+              />
+              <PrimaryButton
+                disabled={!prompt.trim() || status.state !== 'ready'}
+                label={canvasState.turnPending ? 'Sending…' : 'Send'}
+                onPress={handleSend}
+                style={styles.composerButton}
+              />
+            </View>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </KeyboardAvoidingView>
+      </Surface>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   bootText: {
-    color: palette.muted,
     fontSize: 16,
   },
   canvasContent: {
@@ -598,18 +676,21 @@ const styles = StyleSheet.create({
   },
   canvasChip: {
     alignItems: 'center',
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
+    backgroundColor: '#303440',
+    borderBottomColor: lume.colors.borderBtm,
+    borderColor: lume.colors.borderBtm,
     borderRadius: 999,
     borderWidth: 1,
+    borderTopColor: lume.colors.borderTop,
     flexDirection: 'row',
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
   },
   canvasChipActive: {
-    backgroundColor: '#1f2d46',
-    borderColor: palette.accent,
+    backgroundColor: lume.colors.accentSubtle,
+    borderColor: lume.colors.accent,
+    borderTopColor: '#ffffff66',
   },
   canvasChipDot: {
     borderRadius: 5,
@@ -617,13 +698,16 @@ const styles = StyleSheet.create({
     width: 10,
   },
   canvasChipLabel: {
-    color: palette.muted,
+    color: lume.colors.textSecondary,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: lume.fonts.monoMedium,
     maxWidth: 180,
   },
   canvasChipLabelActive: {
-    color: palette.text,
+    color: lume.colors.accent,
+  },
+  canvasChipPressable: {
+    borderRadius: 999,
   },
   canvasChipPressed: {
     opacity: 0.85,
@@ -632,7 +716,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   canvasSwitcher: {
-    borderBottomColor: palette.border,
+    borderBottomColor: lume.colors.borderSubtleBtm,
     borderBottomWidth: 1,
     maxHeight: 62,
   },
@@ -647,18 +731,24 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   composer: {
-    backgroundColor: palette.surface,
-    borderTopColor: palette.border,
+    borderTopColor: lume.colors.borderSubtleTop,
     borderTopWidth: 1,
     gap: 12,
     padding: 16,
   },
+  composerButton: {
+    alignSelf: 'flex-end',
+    minWidth: 120,
+  },
   composerInput: {
-    backgroundColor: palette.bg,
-    borderColor: palette.border,
-    borderRadius: 14,
+    backgroundColor: '#303440',
+    borderBottomColor: lume.colors.borderBtm,
+    borderColor: lume.colors.borderBtm,
+    borderRadius: lume.radius.sm,
     borderWidth: 1,
-    color: palette.text,
+    borderTopColor: lume.colors.borderTop,
+    color: lume.colors.text,
+    fontFamily: lume.fonts.structural,
     maxHeight: 120,
     minHeight: 48,
     paddingHorizontal: 14,
@@ -666,125 +756,146 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
   errorText: {
-    color: '#ff7d7d',
+    color: lume.colors.errorFg,
     fontSize: 13,
   },
   flex: {
     flex: 1,
   },
   header: {
-    borderBottomColor: palette.border,
+    borderBottomColor: lume.colors.borderSubtleBtm,
     borderBottomWidth: 1,
     gap: 4,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   headerTitle: {
-    color: palette.text,
+    color: lume.colors.text,
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: lume.fonts.structuralSemibold,
   },
   heroText: {
-    color: palette.muted,
     fontSize: 15,
     lineHeight: 22,
   },
   heroTitle: {
-    color: palette.text,
+    color: lume.colors.text,
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: lume.fonts.structuralSemibold,
   },
   input: {
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: 14,
+    backgroundColor: '#303440',
+    borderBottomColor: lume.colors.borderBtm,
+    borderColor: lume.colors.borderBtm,
+    borderRadius: lume.radius.sm,
     borderWidth: 1,
-    color: palette.text,
+    borderTopColor: lume.colors.borderTop,
+    color: lume.colors.text,
+    fontFamily: lume.fonts.structural,
     paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  linkText: {
-    color: palette.accent,
-    fontSize: 14,
+  inputMono: {
+    fontFamily: lume.fonts.mono,
+  },
+  linkButton: {
+    alignItems: 'center',
     paddingVertical: 8,
-    textAlign: 'center',
+  },
+  linkText: {
+    color: lume.colors.textSecondary,
+    fontSize: 14,
+    fontFamily: lume.fonts.structuralSemibold,
+  },
+  linkTextPressed: {
+    color: lume.colors.accent,
   },
   noticeText: {
-    color: palette.muted,
     fontSize: 13,
   },
   onboarding: {
     flex: 1,
-    gap: 14,
     justifyContent: 'center',
     padding: 24,
   },
+  onboardingCard: {
+    borderRadius: lume.radius.lg,
+    elevation: Platform.OS === 'android' ? 8 : 0,
+    gap: 14,
+    padding: 26,
+    shadowColor: lume.colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+  },
   placeholder: {
     alignItems: 'center',
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: 18,
-    borderWidth: 1,
+    borderRadius: lume.radius.lg,
     gap: 8,
     padding: 24,
   },
   placeholderText: {
-    color: palette.muted,
     fontSize: 14,
+    lineHeight: 22,
     textAlign: 'center',
   },
   placeholderTitle: {
-    color: palette.text,
+    color: lume.colors.text,
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: lume.fonts.structuralSemibold,
   },
   primaryButton: {
+    borderRadius: lume.radius.md,
+  },
+  primaryButtonFill: {
     alignItems: 'center',
-    backgroundColor: palette.accent,
-    borderRadius: 14,
+    borderBottomColor: lume.colors.accent,
+    borderRadius: lume.radius.md,
+    borderTopColor: '#ffffff66',
+    borderWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   primaryButtonLabel: {
-    color: palette.text,
+    color: lume.colors.textInverse,
     fontSize: 15,
-    fontWeight: '700',
+    fontFamily: lume.fonts.structuralSemibold,
   },
   primaryButtonPressed: {
     opacity: 0.85,
   },
+  primaryButtonShadow: {
+    elevation: Platform.OS === 'android' ? 6 : 0,
+    shadowColor: lume.colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 14,
+  },
   proseCard: {
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: 16,
-    borderWidth: 1,
+    borderRadius: lume.radius.md,
     gap: 8,
     padding: 14,
   },
   proseLabel: {
-    color: palette.muted,
     fontSize: 12,
-    fontWeight: '700',
     textTransform: 'uppercase',
   },
   proseText: {
-    color: palette.text,
+    color: lume.colors.text,
     fontSize: 15,
+    fontFamily: lume.fonts.prose,
     lineHeight: 22,
   },
   safeArea: {
-    backgroundColor: palette.bg,
     flex: 1,
   },
   screen: {
-    backgroundColor: palette.bg,
     flex: 1,
   },
   statusLine: {
-    color: palette.muted,
     fontSize: 13,
   },
 });

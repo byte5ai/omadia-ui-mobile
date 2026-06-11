@@ -1,11 +1,21 @@
 import React, { useMemo, useState } from 'react';
 import {
   Pressable,
+  type PressableStateCallbackType,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  lume,
+  Surface,
+  text as textPreset,
+  textSecondary,
+  mono,
+  heading,
+  containerTitle,
+} from '../theme/lume';
 
 export type PrimitiveJson = { type: string; [key: string]: unknown };
 
@@ -13,15 +23,6 @@ interface PrimitiveNodeProps {
   node: PrimitiveJson;
   onAction?: (node: PrimitiveJson) => void;
 }
-
-const palette = {
-  bg: '#0f1115',
-  surface: '#1a1d24',
-  border: '#2a2f3a',
-  text: '#e6e8eb',
-  muted: '#9aa3af',
-  accent: '#4f8cff',
-};
 
 const noop = () => {};
 
@@ -55,7 +56,7 @@ export function PrimitiveNode({
       const children = getNodeArray(node.children);
 
       return (
-        <View style={styles.container}>
+        <Surface variant="surface" style={styles.container}>
           {title ? <Text style={styles.containerTitle}>{title}</Text> : null}
           {children.map((child, index) => (
             <PrimitiveNode
@@ -64,7 +65,7 @@ export function PrimitiveNode({
               onAction={onAction}
             />
           ))}
-        </View>
+        </Surface>
       );
     }
     case 'pane': {
@@ -73,7 +74,7 @@ export function PrimitiveNode({
       const children = getNodeArray(node.children);
 
       return (
-        <View style={styles.pane}>
+        <Surface variant="surface" style={styles.pane}>
           {title ? <Text style={styles.paneTitle}>{title}</Text> : null}
           {container ? (
             <PrimitiveNode node={container} onAction={onAction} />
@@ -85,7 +86,7 @@ export function PrimitiveNode({
               onAction={onAction}
             />
           ))}
-        </View>
+        </Surface>
       );
     }
     case 'tabs':
@@ -121,21 +122,29 @@ export function PrimitiveNode({
       const label = getString(node.label) ?? 'Button';
 
       return (
-        <Pressable style={styles.button} onPress={() => onAction(node)}>
-          <Text style={styles.buttonLabel}>{label}</Text>
+        <Pressable
+          style={({ pressed }: PressableStateCallbackType) => [
+            styles.buttonPressable,
+            pressed ? styles.buttonPressablePressed : null,
+          ]}
+          onPress={() => onAction(node)}
+        >
+          <Surface variant="raised" style={styles.buttonSurface}>
+            <Text style={styles.buttonLabel}>{label}</Text>
+          </Surface>
         </Pressable>
       );
     }
     case 'status':
-      return (
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>{getString(node.text) ?? ''}</Text>
-        </View>
-      );
+      return <Text style={styles.statusText}>{getString(node.text) ?? ''}</Text>;
     case 'divider':
       return <View style={styles.divider} />;
     default:
-      return <Text style={styles.fallback}>{node.type}</Text>;
+      return (
+        <View style={styles.fallback}>
+          <Text style={styles.fallbackText}>{node.type}</Text>
+        </View>
+      );
   }
 }
 
@@ -155,7 +164,7 @@ function TabsNode({ node, onAction }: TabsNodeProps): React.JSX.Element | null {
       return [];
     }
 
-    return node.tabs.flatMap((tab) => {
+    return node.tabs.flatMap((tab: unknown) => {
       if (
         typeof tab !== 'object' ||
         tab === null ||
@@ -194,7 +203,7 @@ function TabsNode({ node, onAction }: TabsNodeProps): React.JSX.Element | null {
   return (
     <View style={styles.tabsWrap}>
       <View style={styles.tabRow}>
-        {tabs.map((tab, index) => {
+        {tabs.map((tab: TabItem, index: number) => {
           const active = index === clampedIndex;
 
           return (
@@ -233,7 +242,7 @@ function TableNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
       return [];
     }
 
-    return node.columns.flatMap((column) => {
+    return node.columns.flatMap((column: unknown) => {
       if (
         typeof column !== 'object' ||
         column === null ||
@@ -257,7 +266,7 @@ function TableNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
       return [];
     }
 
-    return node.rows.flatMap((row) => {
+    return node.rows.flatMap((row: unknown) => {
       if (
         typeof row !== 'object' ||
         row === null ||
@@ -282,15 +291,15 @@ function TableNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
     <ScrollView horizontal style={styles.tableScroll} contentContainerStyle={styles.table}>
       <View>
         <View style={[styles.tableRow, styles.tableHeaderRow]}>
-          {columns.map((column) => (
+          {columns.map((column: TableColumn) => (
             <View key={column.fieldKey} style={[styles.tableCell, styles.tableHeaderCell]}>
               <Text style={styles.tableHeaderText}>{column.label}</Text>
             </View>
           ))}
         </View>
-        {rows.map((row) => (
+        {rows.map((row: TableRow) => (
           <View key={row.rowKey} style={styles.tableRow}>
-            {columns.map((column) => (
+            {columns.map((column: TableColumn) => (
               <View key={column.fieldKey} style={styles.tableCell}>
                 <Text style={styles.tableCellText}>
                   {String(row.cells[column.fieldKey] ?? '')}
@@ -310,7 +319,7 @@ function ListNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
       return [];
     }
 
-    return node.items.flatMap((item) => {
+    return node.items.flatMap((item: unknown) => {
       if (
         typeof item !== 'object' ||
         item === null ||
@@ -330,7 +339,7 @@ function ListNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
 
   return (
     <View style={styles.list}>
-      {items.map((item) => (
+      {items.map((item: { itemKey: string; label?: string }) => (
         <Text key={item.itemKey} style={styles.listItem}>
           {`\u2022 ${item.label ?? item.itemKey}`}
         </Text>
@@ -340,89 +349,96 @@ function ListNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
-  button: {
-    backgroundColor: palette.accent,
-    borderRadius: 10,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-  },
   buttonLabel: {
-    color: palette.text,
     fontSize: 14,
-    fontWeight: '700',
+    fontFamily: lume.fonts.structural,
+    color: lume.colors.text,
+  },
+  buttonPressable: {
+    alignSelf: 'flex-start',
+    borderRadius: lume.radius.pill,
+  },
+  buttonPressablePressed: {
+    opacity: 0.92,
+  },
+  buttonSurface: {
+    borderRadius: lume.radius.pill,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
   },
   container: {
-    gap: 12,
+    borderRadius: lume.radius.md,
+    gap: lume.spacing.stackGap,
+    padding: lume.spacing.containerPadding,
   },
   containerTitle: {
-    color: palette.text,
-    fontSize: 18,
-    fontWeight: '700',
+    ...containerTitle,
   },
   divider: {
-    backgroundColor: palette.border,
+    backgroundColor: lume.colors.borderSubtleBtm,
     height: StyleSheet.hairlineWidth,
     marginVertical: 4,
   },
   fallback: {
-    color: palette.muted,
+    borderColor: lume.colors.errorEdge,
+    borderRadius: lume.radius.sm,
+    borderStyle: 'dashed',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  fallbackText: {
+    color: lume.colors.errorFg,
     fontSize: 13,
+    fontFamily: lume.fonts.mono,
   },
   heading: {
-    color: palette.text,
-    fontWeight: '700',
+    ...heading,
+    color: lume.colors.text,
   },
   list: {
     gap: 6,
   },
   listItem: {
-    color: palette.text,
+    ...textPreset,
+    color: lume.colors.text,
     fontSize: 15,
     lineHeight: 22,
+    paddingLeft: 12,
   },
   pane: {
-    backgroundColor: palette.surface,
-    borderColor: palette.border,
-    borderRadius: 16,
-    borderWidth: 1,
-    gap: 12,
-    padding: 14,
+    borderRadius: lume.radius.md,
+    gap: lume.spacing.stackGap,
+    padding: lume.spacing.containerPadding,
   },
   paneTitle: {
-    color: palette.text,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: palette.border,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    ...containerTitle,
   },
   statusText: {
-    color: palette.muted,
-    fontSize: 12,
-    fontWeight: '600',
+    ...mono,
+    color: lume.colors.textTertiary,
+    fontSize: 13,
   },
   tabButton: {
-    borderColor: palette.border,
-    borderRadius: 999,
+    backgroundColor: lume.colors.accentSubtle,
+    borderColor: lume.colors.borderSubtleBtm,
+    borderRadius: lume.radius.pill,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
   tabButtonActive: {
-    backgroundColor: palette.accent,
-    borderColor: palette.accent,
+    backgroundColor: lume.colors.accent,
+    borderColor: lume.colors.accent,
   },
   tabLabel: {
-    color: palette.muted,
+    ...textSecondary,
+    color: lume.colors.textSecondary,
     fontSize: 13,
-    fontWeight: '600',
+    fontFamily: lume.fonts.structuralSemibold,
   },
   tabLabelActive: {
-    color: palette.text,
+    color: lume.colors.textInverse,
   },
   tabPanel: {
     marginTop: 12,
@@ -437,27 +453,28 @@ const styles = StyleSheet.create({
   },
   tableCell: {
     borderBottomWidth: 1,
-    borderColor: palette.border,
+    borderColor: lume.colors.borderSubtleBtm,
     minWidth: 120,
     paddingHorizontal: 10,
     paddingVertical: 8,
   },
   tableCellText: {
-    color: palette.text,
-    fontSize: 13,
+    ...mono,
+    color: lume.colors.text,
+    fontSize: 14,
   },
   tableHeaderCell: {
-    backgroundColor: palette.surface,
+    backgroundColor: lume.colors.accentSubtle,
   },
   tableHeaderRow: {
     borderTopWidth: 1,
-    borderTopColor: palette.border,
+    borderTopColor: lume.colors.borderSubtleBtm,
   },
   tableHeaderText: {
-    color: palette.muted,
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
+    ...mono,
+    color: lume.colors.textSecondary,
+    fontSize: 13,
+    fontWeight: '500',
   },
   tableRow: {
     flexDirection: 'row',
@@ -469,7 +486,8 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   text: {
-    color: palette.text,
+    ...textPreset,
+    color: lume.colors.textSecondary,
     fontSize: 15,
     lineHeight: 22,
   },
