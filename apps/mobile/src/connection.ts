@@ -16,7 +16,9 @@ export interface CanvasConnectionHandlers {
 export interface CanvasConnection {
   connect(): void;
   sendTurn(turn: ClientTurn): void;
+  requestCanvasList(): void;
   resync(): void;
+  switchCanvas(sessionId: string): void;
   close(): void;
 }
 
@@ -62,8 +64,14 @@ export function createCanvasConnection(
     sendTurn(turn: ClientTurn) {
       socket.sendTurn(turn);
     },
+    requestCanvasList() {
+      socket.requestCanvasList();
+    },
     resync() {
       socket.resync();
+    },
+    switchCanvas(sessionId: string) {
+      socket.switchCanvas(sessionId);
     },
     close() {
       socket.close();

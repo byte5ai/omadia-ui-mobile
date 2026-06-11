@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import {
   applyServerMessage,
+  type CanvasListEntry,
   initialCanvasState,
   type CanvasState,
   type ClientTurn,
@@ -72,6 +73,9 @@ const isPrimitiveNode = (value: unknown): value is PrimitiveJson =>
   value !== null &&
   typeof (value as PrimitiveJson).type === 'string';
 
+const canvasColorHex = (color: number): string =>
+  `#${(color & 0xffffff).toString(16).padStart(6, '0')}`;
+
 export default function App(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [booting, setBooting] = useState(true);
@@ -94,28 +98,70 @@ export default function App(): React.JSX.Element {
     reduceCanvasState,
     initialCanvasState,
   );
+  const [canvases, setCanvases] = useState<CanvasListEntry[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [previewTree, setPreviewTree] = useState<unknown>(null);
+  const [renderedSessionId, setRenderedSessionId] = useState<string | null>(null);
 
   const canvasStateRef = useRef(canvasState);
   const connectionRef = useRef<CanvasConnection | null>(null);
   const sessionRef = useRef(new AsyncSessionPersistence());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
   const cookieRef = useRef<string | undefined>(undefined);
+  const statusRef = useRef<ConnectionStatus>(status);
 
   useEffect(() => {
     canvasStateRef.current = canvasState;
   }, [canvasState]);
 
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  const openCanvas = useCallback((entry: CanvasListEntry) => {
+    setActiveSessionId(entry.sessionId);
+    setPreviewTree(entry.tree ?? null);
+    connectionRef.current?.switchCanvas(entry.sessionId);
+  }, []);
+
+  useEffect(() => {
+    if (activeSessionId === null && canvases.length > 0) {
+      openCanvas(canvases[0]);
+    }
+  }, [activeSessionId, canvases, openCanvas]);
+
   const handleStatus = useCallback((nextStatus: ConnectionStatus) => {
+    const wasReady = statusRef.current.state === 'ready';
+    statusRef.current = nextStatus;
     console.log(
       `[canvas] status=${nextStatus.state}${nextStatus.detail ? ` detail=${nextStatus.detail}` : ''}`,
     );
     setStatus(nextStatus);
+
+    if (!wasReady && nextStatus.state === 'ready') {
+      connectionRef.current?.requestCanvasList();
+    }
   }, []);
 
   const handleMessage = useCallback((message: ServerMessage) => {
+    if (message.type === 'canvas_list') {
+      setCanvases(message.canvases);
+    }
+
     const result = applyServerMessage(canvasStateRef.current, message);
     canvasStateRef.current = result.state;
     dispatchCanvasMessage(message);
+
+    if (
+      message.type.startsWith('surface_') &&
+      'canvasSessionId' in message &&
+      typeof message.canvasSessionId === 'string'
+    ) {
+      setRenderedSessionId(message.canvasSessionId);
+      if (isPrimitiveNode(result.state.tree)) {
+        setPreviewTree(null);
+      }
+    }
 
     if (result.resync) {
       connectionRef.current?.resync();
@@ -139,6 +185,10 @@ export default function App(): React.JSX.Element {
   const connectToServer = useCallback(
     (serverUrl: string) => {
       connectionRef.current?.close();
+      setCanvases([]);
+      setActiveSessionId(null);
+      setPreviewTree(null);
+      setRenderedSessionId(null);
       const connection = buildConnection(serverUrl);
       connectionRef.current = connection;
       connection.connect();
@@ -411,6 +461,13 @@ export default function App(): React.JSX.Element {
     );
   }
 
+  const liveTree =
+    activeSessionId !== null &&
+    renderedSessionId === activeSessionId &&
+    isPrimitiveNode(canvasState.tree)
+      ? canvasState.tree
+      : null;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView
@@ -432,13 +489,56 @@ export default function App(): React.JSX.Element {
             ) : null}
           </View>
 
+          {canvases.length > 0 ? (
+            <ScrollView
+              contentContainerStyle={styles.canvasSwitcherContent}
+              horizontal
+              keyboardShouldPersistTaps="handled"
+              showsHorizontalScrollIndicator={false}
+              style={styles.canvasSwitcher}
+            >
+              {canvases.map((entry) => {
+                const active = entry.sessionId === activeSessionId;
+                return (
+                  <Pressable
+                    key={entry.sessionId}
+                    onPress={() => openCanvas(entry)}
+                    style={({ pressed }) => [
+                      styles.canvasChip,
+                      active ? styles.canvasChipActive : null,
+                      pressed ? styles.canvasChipPressed : null,
+                    ]}
+                  >
+                    <View
+                      style={[
+                        styles.canvasChipDot,
+                        { backgroundColor: canvasColorHex(entry.color) },
+                      ]}
+                    />
+                    <Text
+                      numberOfLines={1}
+                      style={[
+                        styles.canvasChipLabel,
+                        active ? styles.canvasChipLabelActive : null,
+                      ]}
+                    >
+                      {entry.title}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          ) : null}
+
           <ScrollView
             contentContainerStyle={styles.canvasContent}
             keyboardShouldPersistTaps="handled"
             style={styles.canvasScroll}
           >
-            {isPrimitiveNode(canvasState.tree) ? (
-              <PrimitiveNode node={canvasState.tree} onAction={handleAction} />
+            {liveTree ? (
+              <PrimitiveNode node={liveTree} onAction={handleAction} />
+            ) : isPrimitiveNode(previewTree) ? (
+              <PrimitiveNode node={previewTree} onAction={handleAction} />
             ) : (
               <View style={styles.placeholder}>
                 <Text style={styles.placeholderTitle}>Waiting for canvas…</Text>
@@ -496,8 +596,50 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 16,
   },
+  canvasChip: {
+    alignItems: 'center',
+    backgroundColor: palette.surface,
+    borderColor: palette.border,
+    borderRadius: 999,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  canvasChipActive: {
+    backgroundColor: '#1f2d46',
+    borderColor: palette.accent,
+  },
+  canvasChipDot: {
+    borderRadius: 5,
+    height: 10,
+    width: 10,
+  },
+  canvasChipLabel: {
+    color: palette.muted,
+    fontSize: 14,
+    fontWeight: '600',
+    maxWidth: 180,
+  },
+  canvasChipLabelActive: {
+    color: palette.text,
+  },
+  canvasChipPressed: {
+    opacity: 0.85,
+  },
   canvasScroll: {
     flex: 1,
+  },
+  canvasSwitcher: {
+    borderBottomColor: palette.border,
+    borderBottomWidth: 1,
+    maxHeight: 62,
+  },
+  canvasSwitcherContent: {
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
   },
   centered: {
     alignItems: 'center',

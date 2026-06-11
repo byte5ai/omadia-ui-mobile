@@ -1,5 +1,10 @@
 import type { ConnectionStatus } from './connection.js';
-import { parseServerMessage, type ClientTurn, type ServerMessage } from './protocol.js';
+import {
+  parseServerMessage,
+  type ClientCanvasListGet,
+  type ClientTurn,
+  type ServerMessage,
+} from './protocol.js';
 import { createHandshake } from './handshake.js';
 
 export interface SessionPersistence {
@@ -48,6 +53,8 @@ export class CanvasSocket {
   private closedByUser = false;
   private attempt = 0;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private resumeOverride: string | undefined;
+  private switching = false;
 
   constructor(private readonly opts: CanvasSocketOptions) {}
 
@@ -64,6 +71,14 @@ export class CanvasSocket {
     }
   }
 
+  requestCanvasList(): void {
+    if (!this.ready || this.ws?.readyState !== WS_OPEN) {
+      return;
+    }
+    const request = { type: 'canvas_list_get' } satisfies ClientCanvasListGet;
+    this.ws.send(JSON.stringify(request));
+  }
+
   /** Tear down and re-handshake with the persisted canvasSessionId. */
   resync(): void {
     this.ws?.close(4000, 'client resync');
@@ -72,7 +87,19 @@ export class CanvasSocket {
   close(): void {
     this.closedByUser = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.switching = false;
     this.ws?.close(1000, 'client shutdown');
+  }
+
+  switchCanvas(sessionId: string): void {
+    this.resumeOverride = sessionId;
+    this.closedByUser = false;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = null;
+    this.switching = true;
+    this.ws?.close(4001, 'client canvas switch');
+    this.open();
   }
 
   private open(): void {
@@ -81,15 +108,17 @@ export class CanvasSocket {
     const headers = this.opts.cookie ? { Cookie: this.opts.cookie } : undefined;
     const ws = this.opts.createWebSocket(this.opts.url, headers);
     this.ws = ws;
+    this.switching = false;
 
     const handshake = createHandshake({
       protocolVersions: ['1.0'],
       opsCatalogVersions: ['1.0'],
       localOperations: this.opts.localOperations,
-      canvasSessionId: this.opts.session.load(),
+      canvasSessionId: this.resumeOverride ?? this.opts.session.load(),
     });
 
     ws.onmessage = (ev) => {
+      if (this.ws !== ws) return;
       const msg = parseServerMessage(String(ev.data));
       if (!msg) return;
 
@@ -101,6 +130,7 @@ export class CanvasSocket {
         } else if (action.kind === 'ready') {
           this.ready = true;
           this.attempt = 0;
+          this.resumeOverride = undefined;
           this.opts.session.save(action.canvasSessionId);
           this.opts.onStatus({ state: 'ready', canvasSessionId: action.canvasSessionId });
         } else {
@@ -114,7 +144,11 @@ export class CanvasSocket {
     };
 
     ws.onclose = () => {
+      if (this.ws !== ws) return;
       this.ready = false;
+      if (this.switching) {
+        return;
+      }
       if (this.closedByUser) {
         this.opts.onStatus({ state: 'disconnected' });
         return;
@@ -122,10 +156,14 @@ export class CanvasSocket {
       const delay = BACKOFF_MS[Math.min(this.attempt, BACKOFF_MS.length - 1)] as number;
       this.attempt += 1;
       this.opts.onStatus({ state: 'connecting', detail: `reconnecting in ${delay}ms` });
-      this.reconnectTimer = setTimeout(() => this.open(), delay);
+      this.reconnectTimer = setTimeout(() => {
+        this.reconnectTimer = null;
+        this.open();
+      }, delay);
     };
 
     ws.onerror = (ev) => {
+      if (this.ws !== ws) return;
       this.opts.onStatus({ state: 'failed', detail: ev.message ?? 'websocket error' });
       // 'close' follows and drives the backoff.
     };
