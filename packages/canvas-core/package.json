@@ -1,0 +1,28 @@
+{
+  "name": "@omadia/canvas-core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Platform-neutral Omadia canvas protocol core: protocol types, tree patching, store reducer, handshake FSM, WebSocket-injected socket client, precompiled ajv validators",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "gen": "bun tools/genValidator.ts",
+    "pretest": "bun run gen",
+    "test": "bunx vitest run",
+    "pretypecheck": "bun run gen",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.3",
+    "@types/ws": "^8.18.1",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.8",
+    "ws": "^8.21.0"
+  }
+}

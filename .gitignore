@@ -1,0 +1,8 @@
+node_modules/
+dist/
+.expo/
+*.tsbuildinfo
+validators.generated.mjs
+.DS_Store
+ios/build/
+android/build/

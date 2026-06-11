@@ -1,0 +1,15 @@
+{
+  "name": "omadia-ui-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Omadia UI — Mobile Host (React Native / Expo, iOS first) + platform-neutral canvas-core",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "gen": "bun run --filter @omadia/canvas-core gen",
+    "test": "bun run --filter @omadia/canvas-core test",
+    "typecheck": "bun run --filter '*' typecheck"
+  }
+}
