@@ -118,6 +118,7 @@ Lauffähiges Workspace-Repo `~/sources/omadia-ui-mobile`: `canvas-core` mit port
 - ISC-30: Greps App.tsx — createCanvasConnection, AppState-Listener, resync() on foreground
 - ISC-31: `bunx tsc --noEmit` apps/mobile → exit 0 (eigener Lauf, nicht nur Forge)
 - ISC-32: Onboarding TextInput + Connect in App.tsx (rg-Treffer)
+- RUNTIME (2026-06-11 10:49): App startet im iPhone-17-Pro-Simulator (Expo Go SDK 56). metro.config.js löst NodeNext-`.js`-Specifier auf TS-Quelle → `iOS Bundled 716 modules`, keine Runtime-Errors. Screenshot zeigt Onboarding "Connect to Omadia Canvas". Login-Flow: Server-URL → prepare() probt Provider-Katalog → Passwort-Provider → Login-Screen → /api/v1/auth/login/local → Cookie → WS. Interaktives Durchtippen (Login mit echten Credentials, Canvas-Render) = User-Schritt; simctl/AppleScript-UI-Steuerung mangels Accessibility-Freigabe nicht möglich. Smoke gegen echte Middleware bestätigt Transport+Protokoll bis Auth-Grenze; Desktop-identischer Login-Request → 401 auth.invalid_credentials bei den getesteten Credentials.
 - ISC-33: `git status --porcelain` in omadia-ui → leer
 - ISC-34: rg "npm |npx " über alle package.json/README → keine Treffer
 - ISC-35: `git worktree list` → nur main
