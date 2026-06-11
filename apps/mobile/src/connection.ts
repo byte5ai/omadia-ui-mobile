@@ -33,7 +33,7 @@ const createWebSocket: WebSocketFactory = (url, headers) => {
   console.log(`[ws] connect ${url} cookie=${cookieLen > 0 ? `yes(${cookieLen} chars)` : 'no'}`);
   return new ReactNativeWebSocket(
     url,
-    undefined,
+    null,
     headers ? { headers } : undefined,
   ) as unknown as WsLike;
 };
