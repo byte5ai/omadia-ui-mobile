@@ -582,6 +582,7 @@ export default function App(): React.JSX.Element {
                       onPress={() => openCanvas(entry)}
                       style={({ pressed }) => [
                         styles.canvasChipPressable,
+                        active ? styles.canvasChipPressableActive : null,
                         pressed ? styles.canvasChipPressed : null,
                       ]}
                     >
@@ -590,7 +591,7 @@ export default function App(): React.JSX.Element {
                           styles.canvasChip,
                           active ? styles.canvasChipActive : null,
                         ]}
-                        variant="raised"
+                        variant={active ? 'accentSubtle' : 'raised'}
                       >
                         <View
                           style={[
@@ -673,34 +674,34 @@ const styles = StyleSheet.create({
   canvasContent: {
     gap: 16,
     padding: 16,
+    paddingBottom: 28,
   },
   canvasChip: {
     alignItems: 'center',
-    backgroundColor: '#303440',
-    borderBottomColor: lume.colors.borderBtm,
-    borderColor: lume.colors.borderBtm,
     borderRadius: 999,
-    borderWidth: 1,
-    borderTopColor: lume.colors.borderTop,
     flexDirection: 'row',
     gap: 10,
-    paddingHorizontal: 14,
+    justifyContent: 'center',
+    minHeight: lume.controls.minTouchHeight,
+    paddingHorizontal: 16,
     paddingVertical: 10,
   },
   canvasChipActive: {
-    backgroundColor: lume.colors.accentSubtle,
-    borderColor: lume.colors.accent,
-    borderTopColor: '#ffffff66',
+    borderBottomColor: lume.colors.accent,
+    borderColor: lume.colors.accentEdge,
+    borderTopColor: '#ffffff52',
   },
   canvasChipDot: {
-    borderRadius: 5,
-    height: 10,
-    width: 10,
+    borderColor: lume.colors.borderSubtleBtm,
+    borderRadius: 6,
+    borderWidth: 1,
+    height: 12,
+    width: 12,
   },
   canvasChipLabel: {
     color: lume.colors.textSecondary,
-    fontSize: 14,
     fontFamily: lume.fonts.monoMedium,
+    fontSize: 14,
     maxWidth: 180,
   },
   canvasChipLabelActive: {
@@ -708,6 +709,13 @@ const styles = StyleSheet.create({
   },
   canvasChipPressable: {
     borderRadius: 999,
+  },
+  canvasChipPressableActive: {
+    elevation: Platform.OS === 'android' ? 6 : 0,
+    shadowColor: lume.colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.26,
+    shadowRadius: 12,
   },
   canvasChipPressed: {
     opacity: 0.85,
@@ -718,9 +726,10 @@ const styles = StyleSheet.create({
   canvasSwitcher: {
     borderBottomColor: lume.colors.borderSubtleBtm,
     borderBottomWidth: 1,
-    maxHeight: 62,
+    maxHeight: 72,
   },
   canvasSwitcherContent: {
+    alignItems: 'center',
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,

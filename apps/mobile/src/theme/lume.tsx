@@ -14,6 +14,7 @@ export const lume = {
   colors: {
     accent: '#6fc8d6',
     accentActive: '#a1dce6',
+    accentEdge: 'rgba(111,200,214,0.72)',
     accentGlow: 'rgba(111,200,214,0.32)',
     accentGlowCore: 'rgba(210,245,250,0.5)',
     accentGlowStrong: 'rgba(111,200,214,0.48)',
@@ -45,10 +46,14 @@ export const lume = {
   },
   gradients: {
     accentFill: ['#88d2de', '#6fc8d6'] as GradientStops,
+    accentSubtle: ['#314149', '#27343a'] as GradientStops,
     bg: ['#232631', '#1b1d24'] as GradientStops,
     raised: ['#303440', '#292c37'] as GradientStops,
     sunken: ['#1d1f26', '#16181e'] as GradientStops,
     surface: ['#2a2d38', '#23262f'] as GradientStops,
+  },
+  controls: {
+    minTouchHeight: 44,
   },
   radius: {
     lg: 12,
@@ -80,6 +85,10 @@ const borderByVariant: Record<
   accentFill: {
     bottom: lume.colors.accent,
     top: 'rgba(255,255,255,0.18)',
+  },
+  accentSubtle: {
+    bottom: lume.colors.accentEdge,
+    top: 'rgba(255,255,255,0.14)',
   },
   bg: {
     bottom: lume.colors.borderSubtleBtm,

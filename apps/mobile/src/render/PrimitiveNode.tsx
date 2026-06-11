@@ -42,9 +42,13 @@ const getNodeArray = (value: unknown): PrimitiveJson[] =>
 
 const getHeadingSize = (level: number): number => {
   const clamped = Math.max(1, Math.min(6, level));
-  const sizes = [26, 24, 21, 18, 16, 14];
+  const sizes = [25, 24, 21, 18, 16, 14];
   return sizes[clamped - 1];
 };
+
+const TABLE_FIRST_COLUMN_WIDTH = 152;
+const TABLE_COLUMN_MIN_WIDTH = 136;
+const TAB_SEGMENT_MIN_HEIGHT = 38;
 
 export function PrimitiveNode({
   node,
@@ -202,23 +206,41 @@ function TabsNode({ node, onAction }: TabsNodeProps): React.JSX.Element | null {
 
   return (
     <View style={styles.tabsWrap}>
-      <View style={styles.tabRow}>
+      <Surface style={styles.tabTrack} variant="sunken">
+        <View style={styles.tabRow}>
         {tabs.map((tab: TabItem, index: number) => {
           const active = index === clampedIndex;
 
           return (
             <Pressable
               key={`${tab.label}-${index}`}
-              style={[styles.tabButton, active ? styles.tabButtonActive : null]}
               onPress={() => setActiveIndex(index)}
+              style={({ pressed }: PressableStateCallbackType) => [
+                styles.tabSegmentPressable,
+                pressed ? styles.tabSegmentPressed : null,
+              ]}
             >
-              <Text style={[styles.tabLabel, active ? styles.tabLabelActive : null]}>
-                {tab.label}
-              </Text>
+              {active ? (
+                <Surface style={styles.tabSegmentActive} variant="accentSubtle">
+                  <Text
+                    numberOfLines={1}
+                    style={[styles.tabLabel, styles.tabLabelActive]}
+                  >
+                    {tab.label}
+                  </Text>
+                </Surface>
+              ) : (
+                <View style={styles.tabSegment}>
+                  <Text numberOfLines={1} style={styles.tabLabel}>
+                    {tab.label}
+                  </Text>
+                </View>
+              )}
             </Pressable>
           );
         })}
-      </View>
+        </View>
+      </Surface>
       <View style={styles.tabPanel}>
         <PrimitiveNode node={tabs[clampedIndex].child} onAction={onAction} />
       </View>
@@ -288,28 +310,71 @@ function TableNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
   }, [node.rows]);
 
   return (
-    <ScrollView horizontal style={styles.tableScroll} contentContainerStyle={styles.table}>
-      <View>
+    <Surface style={styles.tableShell} variant="sunken">
+      <ScrollView
+        contentContainerStyle={styles.table}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tableScroll}
+      >
+        <View>
         <View style={[styles.tableRow, styles.tableHeaderRow]}>
-          {columns.map((column: TableColumn) => (
-            <View key={column.fieldKey} style={[styles.tableCell, styles.tableHeaderCell]}>
-              <Text style={styles.tableHeaderText}>{column.label}</Text>
-            </View>
-          ))}
+          {columns.map((column: TableColumn, index: number) => {
+            const firstColumn = index === 0;
+            return (
+              <View
+                key={column.fieldKey}
+                style={[
+                  styles.tableCell,
+                  styles.tableHeaderCell,
+                  firstColumn ? styles.tableFirstCell : styles.tableDataCell,
+                  firstColumn ? styles.tableFirstHeaderCell : null,
+                ]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.tableHeaderText,
+                    firstColumn ? styles.tableFirstHeaderText : null,
+                  ]}
+                >
+                  {column.label}
+                </Text>
+              </View>
+            );
+          })}
         </View>
         {rows.map((row: TableRow) => (
           <View key={row.rowKey} style={styles.tableRow}>
-            {columns.map((column: TableColumn) => (
-              <View key={column.fieldKey} style={styles.tableCell}>
-                <Text style={styles.tableCellText}>
-                  {String(row.cells[column.fieldKey] ?? '')}
-                </Text>
-              </View>
-            ))}
+            {columns.map((column: TableColumn, index: number) => {
+              const firstColumn = index === 0;
+              const cellValue = String(row.cells[column.fieldKey] ?? '');
+              return (
+                <View
+                  key={column.fieldKey}
+                  style={[
+                    styles.tableCell,
+                    firstColumn ? styles.tableFirstCell : styles.tableDataCell,
+                    firstColumn ? styles.tableFirstBodyCell : null,
+                  ]}
+                >
+                  <Text
+                    numberOfLines={firstColumn ? 2 : undefined}
+                    style={[
+                      styles.tableCellText,
+                      firstColumn ? styles.tableFirstCellText : null,
+                    ]}
+                  >
+                    {cellValue}
+                  </Text>
+                </View>
+              );
+            })}
           </View>
         ))}
       </View>
     </ScrollView>
+  </Surface>
   );
 }
 
@@ -350,21 +415,23 @@ function ListNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
 
 const styles = StyleSheet.create({
   buttonLabel: {
-    fontSize: 14,
-    fontFamily: lume.fonts.structural,
     color: lume.colors.text,
+    fontFamily: lume.fonts.structuralSemibold,
+    fontSize: 14,
   },
   buttonPressable: {
     alignSelf: 'flex-start',
     borderRadius: lume.radius.pill,
   },
   buttonPressablePressed: {
-    opacity: 0.92,
+    opacity: 0.84,
   },
   buttonSurface: {
     borderRadius: lume.radius.pill,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    justifyContent: 'center',
+    minHeight: lume.controls.minTouchHeight,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
   },
   container: {
     borderRadius: lume.radius.md,
@@ -397,7 +464,7 @@ const styles = StyleSheet.create({
     color: lume.colors.text,
   },
   list: {
-    gap: 6,
+    gap: 4,
   },
   listItem: {
     ...textPreset,
@@ -405,6 +472,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     paddingLeft: 12,
+    paddingVertical: 6,
   },
   pane: {
     borderRadius: lume.radius.md,
@@ -419,65 +487,109 @@ const styles = StyleSheet.create({
     color: lume.colors.textTertiary,
     fontSize: 13,
   },
-  tabButton: {
-    backgroundColor: lume.colors.accentSubtle,
-    borderColor: lume.colors.borderSubtleBtm,
-    borderRadius: lume.radius.pill,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  tabButtonActive: {
-    backgroundColor: lume.colors.accent,
-    borderColor: lume.colors.accent,
-  },
   tabLabel: {
     ...textSecondary,
     color: lume.colors.textSecondary,
     fontSize: 13,
     fontFamily: lume.fonts.structuralSemibold,
+    textAlign: 'center',
   },
   tabLabelActive: {
-    color: lume.colors.textInverse,
+    color: lume.colors.accent,
   },
   tabPanel: {
-    marginTop: 12,
+    marginTop: 14,
   },
   tabRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
+  },
+  tabSegment: {
+    alignItems: 'center',
+    borderRadius: 12,
+    justifyContent: 'center',
+    minHeight: TAB_SEGMENT_MIN_HEIGHT,
+    minWidth: 0,
+    paddingHorizontal: 14,
+  },
+  tabSegmentActive: {
+    alignItems: 'center',
+    borderRadius: 12,
+    justifyContent: 'center',
+    minHeight: TAB_SEGMENT_MIN_HEIGHT,
+    paddingHorizontal: 14,
+    shadowColor: lume.colors.accent,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+  },
+  tabSegmentPressed: {
+    opacity: 0.9,
+  },
+  tabSegmentPressable: {
+    borderRadius: 12,
+    flex: 1,
+  },
+  tabTrack: {
+    borderRadius: 14,
+    padding: 4,
   },
   table: {
     paddingBottom: 4,
   },
   tableCell: {
+    borderBottomColor: lume.colors.borderSubtleBtm,
     borderBottomWidth: 1,
-    borderColor: lume.colors.borderSubtleBtm,
-    minWidth: 120,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    justifyContent: 'center',
+    minHeight: lume.controls.minTouchHeight,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
   },
   tableCellText: {
     ...mono,
     color: lume.colors.text,
     fontSize: 14,
   },
+  tableDataCell: {
+    minWidth: TABLE_COLUMN_MIN_WIDTH,
+  },
   tableHeaderCell: {
-    backgroundColor: lume.colors.accentSubtle,
+    backgroundColor: lume.colors.insetHighlight,
+    borderBottomColor: lume.colors.borderBtm,
+  },
+  tableFirstBodyCell: {
+    borderRightColor: lume.colors.borderSubtleTop,
+    borderRightWidth: 1,
+  },
+  tableFirstCell: {
+    minWidth: TABLE_FIRST_COLUMN_WIDTH,
+    width: TABLE_FIRST_COLUMN_WIDTH,
+  },
+  tableFirstCellText: {
+    fontFamily: lume.fonts.monoMedium,
+  },
+  tableFirstHeaderCell: {
+    borderRightColor: lume.colors.borderTop,
+    borderRightWidth: 1,
+  },
+  tableFirstHeaderText: {
+    color: lume.colors.text,
+    fontFamily: lume.fonts.monoMedium,
   },
   tableHeaderRow: {
+    borderTopColor: lume.colors.borderSubtleTop,
     borderTopWidth: 1,
-    borderTopColor: lume.colors.borderSubtleBtm,
   },
   tableHeaderText: {
     ...mono,
     color: lume.colors.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
   },
   tableRow: {
     flexDirection: 'row',
+  },
+  tableShell: {
+    borderRadius: lume.radius.md,
   },
   tableScroll: {
     maxWidth: '100%',
