@@ -9,10 +9,11 @@
     ".": "./src/index.ts"
   },
   "scripts": {
+    "sync": "node ../../scripts/sync-canvas-core.mjs",
     "gen": "bun tools/genValidator.ts",
-    "pretest": "bun run gen",
+    "pretest": "bun run sync && bun run gen",
     "test": "bunx vitest run",
-    "pretypecheck": "bun run gen",
+    "pretypecheck": "bun run sync && bun run gen",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

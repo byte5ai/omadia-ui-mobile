@@ -50,14 +50,19 @@ Run the iOS app:
 cd apps/mobile && bunx expo start --ios
 ```
 
-## Schemas
+## Canonical source & sync
 
-The canonical canvas-tree schema lives in the
-[`@omadia/canvas-core`](https://github.com/byte5ai/omadia) package inside the
-omadia monorepo — `packages/canvas-core/schema/` in this repo is a **vendored
-copy**. When the protocol changes upstream: sync the schemas here and re-run
-`bun run gen`. (Wiring this repo onto an automated sibling-checkout sync, the
-same mechanism the other renderers use, is planned.)
+The protocol core (sources, schemas, tests, and the 25 contract fixtures) is
+**not vendored here** — it is synced at test/typecheck time from the canonical
+[`@omadia/canvas-core`](https://github.com/byte5ai/omadia) package in the
+omadia monorepo via `scripts/sync-canvas-core.mjs`. The synced files are
+gitignored; only the package shell (`package.json`, `tsconfig.json`,
+mobile-only dev tools) is committed.
+
+A sibling checkout of `byte5ai/omadia` is expected at `../omadia` (override
+with `OMADIA_REPO`). Run the sync manually with `bun run sync`; `test` and
+`typecheck` run it automatically. This is the same no-drift mechanism the
+other protocol consumers use — one schema, one source of truth.
 
 ## The App Store invariant
 

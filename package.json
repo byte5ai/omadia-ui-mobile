@@ -8,6 +8,7 @@
     "apps/*"
   ],
   "scripts": {
+    "sync": "node scripts/sync-canvas-core.mjs",
     "gen": "bun run --filter @omadia/canvas-core gen",
     "test": "bun run --filter @omadia/canvas-core test",
     "typecheck": "bun run --filter '*' typecheck"

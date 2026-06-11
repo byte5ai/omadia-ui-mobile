@@ -6,3 +6,12 @@ validators.generated.mjs
 .DS_Store
 ios/build/
 android/build/
+
+# synced from the canonical @omadia/canvas-core (omadia monorepo) — see scripts/sync-canvas-core.mjs
+packages/canvas-core/src/
+packages/canvas-core/schema/
+packages/canvas-core/test/
+packages/canvas-core/fixtures/
+packages/canvas-core/tools/genValidator.ts
+packages/canvas-core/tools/stubServer.ts
+packages/canvas-core/tools/recordings/
