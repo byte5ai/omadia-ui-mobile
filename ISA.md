@@ -104,6 +104,7 @@ Lauffähiges Workspace-Repo `~/sources/omadia-ui-mobile`: `canvas-core` mit port
 - 2026-06-11 10:02 — Eigenes Root-Repo statt Monorepo-Erweiterung (explizite Vorgabe Marcel). canvas-core lebt hier; Rückkonsum durch Electron-App später via Package-Publish oder Repo-Move. Schemas dupliziert — Quelle bleibt omadia-ui/docs, Sync-Pflicht im README.
 - 2026-06-11 10:02 — CanvasSocket auf Standard-WebSocket-Handler-API (onmessage/onclose/onerror) mit injizierter Factory umgestellt: läuft mit RN-WebSocket nativ und mit `ws` unter Node — Core bleibt plattformneutral.
 - 2026-06-11 10:02 — ApertureOscillation aus dem Plan-Lauf dieser Session übernommen (MVP-Schnitt, Prebuild-Pfad, Capability-Hints später) statt erneut zu invoken — identisches Designproblem, frisches Ergebnis.
+- 2026-06-11 10:40 — Auth in MVP nachgezogen (war Plan-Phase-1 "High effort"): echte Middleware verlangt omadia_session-Cookie (WS-Upgrade 401 ohne). smoke.ts gegen echten Server verifiziert Transport+Protokollverhandlung bis Auth-Grenze. Login-Script-Versuch des Users → 401 auth.invalid_credentials (Request-Shape = Desktop-Referenz, also Credentials-/Account-seitig, nicht Script-Bug). Konsequenz: Login-Screen (Email/Passwort → /api/v1/auth/login/:id → Set-Cookie → WS-Cookie-Header) in die App gebaut; in-App-Eingabe umgeht Shell-Escaping. RN-Set-Cookie-Sichtbarkeit per Simulator zu verifizieren (offen).
 
 ## Verification
 
