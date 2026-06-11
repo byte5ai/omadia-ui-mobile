@@ -36,11 +36,21 @@ const turnText = flag('turn');
 const httpOrigin = (wsUrl: string): string =>
   new URL(wsUrl).origin.replace(/^ws/, 'http');
 
-/** Log in via the password provider, return the `omadia_session=…` cookie. */
+/** Log in via the password provider, return the `omadia_session=…` cookie.
+ *  Credentials come from a file (--creds <path>: line 1 email, line 2 password)
+ *  so special characters never hit the shell, or from OMADIA_USER/OMADIA_PASS. */
 async function login(wsUrl: string): Promise<string> {
-  const user = process.env.OMADIA_USER;
-  const pass = process.env.OMADIA_PASS;
-  if (!user || !pass) throw new Error('--login needs OMADIA_USER and OMADIA_PASS in the environment');
+  let user = process.env.OMADIA_USER;
+  let pass = process.env.OMADIA_PASS;
+  const credsFile = flag('creds');
+  if (credsFile) {
+    const { readFileSync } = await import('node:fs');
+    const lines = readFileSync(credsFile, 'utf8').split('\n');
+    user = (lines[0] ?? '').trim();
+    pass = lines[1] ?? '';
+    if (pass.endsWith('\r')) pass = pass.slice(0, -1);
+  }
+  if (!user || !pass) throw new Error('--login needs --creds <file> or OMADIA_USER/OMADIA_PASS');
   const res = await fetch(`${httpOrigin(wsUrl)}/api/v1/auth/login/local`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
