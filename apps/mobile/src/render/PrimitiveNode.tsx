@@ -46,6 +46,22 @@ const getHeadingSize = (level: number): number => {
   return sizes[clamped - 1];
 };
 
+/** schema `tone` severity hint → Lume status colour. neutral/absent → none. */
+const toneColor = (node: PrimitiveJson): string | undefined => {
+  switch (node.tone) {
+    case 'success':
+      return lume.colors.successFg;
+    case 'warning':
+      return lume.colors.warningFg;
+    case 'danger':
+      return lume.colors.errorFg;
+    case 'info':
+      return lume.colors.accent;
+    default:
+      return undefined;
+  }
+};
+
 const TABLE_FIRST_COLUMN_WIDTH = 152;
 const TABLE_COLUMN_MIN_WIDTH = 136;
 const TAB_SEGMENT_MIN_HEIGHT = 38;
@@ -98,11 +114,22 @@ export function PrimitiveNode({
     case 'heading': {
       const content = getString(node.content) ?? '';
       const size = getHeadingSize(getNumber(node.level) ?? 2);
+      const tone = toneColor(node);
 
-      return <Text style={[styles.heading, { fontSize: size }]}>{content}</Text>;
+      return (
+        <Text style={[styles.heading, { fontSize: size }, tone ? { color: tone } : null]}>
+          {content}
+        </Text>
+      );
     }
-    case 'text':
-      return <Text style={styles.text}>{getString(node.content) ?? ''}</Text>;
+    case 'text': {
+      const tone = toneColor(node);
+      return (
+        <Text style={[styles.text, tone ? { color: tone } : null]}>
+          {getString(node.content) ?? ''}
+        </Text>
+      );
+    }
     case 'table':
       return <TableNode node={node} />;
     case 'list':
@@ -139,8 +166,24 @@ export function PrimitiveNode({
         </Pressable>
       );
     }
-    case 'status':
-      return <Text style={styles.statusText}>{getString(node.text) ?? ''}</Text>;
+    case 'status': {
+      const tone = toneColor(node);
+      const value = getString(node.text) ?? '';
+      if (tone) {
+        return (
+          <View
+            style={[
+              styles.statusChip,
+              { backgroundColor: `${tone}1f`, borderColor: `${tone}47` },
+            ]}
+          >
+            <View style={[styles.statusDot, { backgroundColor: tone }]} />
+            <Text style={[styles.statusChipText, { color: tone }]}>{value}</Text>
+          </View>
+        );
+      }
+      return <Text style={styles.statusText}>{value}</Text>;
+    }
     case 'divider':
       return <View style={styles.divider} />;
     default:
@@ -397,6 +440,7 @@ function ListNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
         {
           itemKey: (item as { itemKey: string }).itemKey,
           label: getString((item as { label?: unknown }).label),
+          tone: toneColor(item as PrimitiveJson),
         },
       ];
     });
@@ -404,10 +448,15 @@ function ListNode({ node }: { node: PrimitiveJson }): React.JSX.Element {
 
   return (
     <View style={styles.list}>
-      {items.map((item: { itemKey: string; label?: string }) => (
-        <Text key={item.itemKey} style={styles.listItem}>
-          {`\u2022 ${item.label ?? item.itemKey}`}
-        </Text>
+      {items.map((item: { itemKey: string; label?: string; tone?: string }) => (
+        <View key={item.itemKey} style={styles.listRow}>
+          <Text style={[styles.listBullet, item.tone ? { color: item.tone } : null]}>
+            {'\u2022'}
+          </Text>
+          <Text style={[styles.listItem, item.tone ? { color: item.tone } : null]}>
+            {item.label ?? item.itemKey}
+          </Text>
+        </View>
       ))}
     </View>
   );
@@ -464,15 +513,26 @@ const styles = StyleSheet.create({
     color: lume.colors.text,
   },
   list: {
-    gap: 4,
+    gap: 2,
+  },
+  listRow: {
+    flexDirection: 'row',
+    paddingVertical: 6,
+  },
+  listBullet: {
+    ...textPreset,
+    color: lume.colors.accent,
+    fontSize: 15,
+    lineHeight: 22,
+    paddingLeft: 4,
+    width: 20,
   },
   listItem: {
     ...textPreset,
     color: lume.colors.text,
+    flex: 1,
     fontSize: 15,
     lineHeight: 22,
-    paddingLeft: 12,
-    paddingVertical: 6,
   },
   pane: {
     borderRadius: lume.radius.md,
@@ -485,6 +545,25 @@ const styles = StyleSheet.create({
   statusText: {
     ...mono,
     color: lume.colors.textTertiary,
+    fontSize: 13,
+  },
+  statusChip: {
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: lume.radius.sm,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: 7,
+    paddingHorizontal: 11,
+    paddingVertical: 6,
+  },
+  statusDot: {
+    borderRadius: 999,
+    height: 7,
+    width: 7,
+  },
+  statusChipText: {
+    fontFamily: lume.fonts.structuralSemibold,
     fontSize: 13,
   },
   tabLabel: {
