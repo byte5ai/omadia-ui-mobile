@@ -37,6 +37,13 @@ import {
   createCanvasConnection,
   type CanvasConnection,
 } from './src/connection';
+import {
+  fetchProviders,
+  httpOriginFromWs,
+  loginWithPassword,
+} from './src/auth';
+
+type Screen = 'url' | 'login' | 'canvas';
 
 const palette = {
   bg: '#0f1115',
@@ -64,12 +71,21 @@ const isPrimitiveNode = (value: unknown): value is PrimitiveJson =>
 export default function App(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [booting, setBooting] = useState(true);
+  const [screen, setScreen] = useState<Screen>('url');
   const [urlInput, setUrlInput] = useState('');
   const [status, setStatus] = useState<ConnectionStatus>({
     state: 'disconnected',
   });
   const [prompt, setPrompt] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // sign-in form
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [providerId, setProviderId] = useState('local');
+
   const [canvasState, dispatchCanvasMessage] = useReducer(
     reduceCanvasState,
     initialCanvasState,
@@ -79,6 +95,7 @@ export default function App(): React.JSX.Element {
   const connectionRef = useRef<CanvasConnection | null>(null);
   const sessionRef = useRef(new AsyncSessionPersistence());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
+  const cookieRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     canvasStateRef.current = canvasState;
@@ -100,10 +117,15 @@ export default function App(): React.JSX.Element {
 
   const buildConnection = useCallback(
     (serverUrl: string): CanvasConnection =>
-      createCanvasConnection(serverUrl, sessionRef.current, {
-        onMessage: handleMessage,
-        onStatus: handleStatus,
-      }),
+      createCanvasConnection(
+        serverUrl,
+        sessionRef.current,
+        {
+          onMessage: handleMessage,
+          onStatus: handleStatus,
+        },
+        cookieRef.current,
+      ),
     [handleMessage, handleStatus],
   );
 
@@ -113,8 +135,33 @@ export default function App(): React.JSX.Element {
       const connection = buildConnection(serverUrl);
       connectionRef.current = connection;
       connection.connect();
+      setScreen('canvas');
     },
     [buildConnection],
+  );
+
+  /** Decide whether the server needs a password login before connecting. */
+  const prepare = useCallback(
+    async (serverUrl: string) => {
+      let origin: string;
+      try {
+        origin = httpOriginFromWs(serverUrl);
+      } catch {
+        connectToServer(serverUrl);
+        return;
+      }
+      const providers = await fetchProviders(origin);
+      const passwordProvider = providers?.find((p) => p.kind === 'password');
+      if (passwordProvider) {
+        setProviderId(passwordProvider.id);
+        setAuthError(null);
+        setScreen('login');
+      } else {
+        // no auth (e.g. stub server) — connect straight through
+        connectToServer(serverUrl);
+      }
+    },
+    [connectToServer],
   );
 
   useEffect(() => {
@@ -132,7 +179,7 @@ export default function App(): React.JSX.Element {
       if (loadedSettings) {
         setSettings(loadedSettings);
         setUrlInput(loadedSettings.serverUrl);
-        connectToServer(loadedSettings.serverUrl);
+        await prepare(loadedSettings.serverUrl);
       }
 
       setBooting(false);
@@ -144,7 +191,7 @@ export default function App(): React.JSX.Element {
       mounted = false;
       connectionRef.current?.close();
     };
-  }, [connectToServer]);
+  }, [prepare]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
@@ -176,8 +223,35 @@ export default function App(): React.JSX.Element {
     await SettingsStorage.save(nextSettings);
     setValidationError(null);
     setSettings(nextSettings);
-    connectToServer(trimmedUrl);
-  }, [connectToServer, urlInput]);
+    await prepare(trimmedUrl);
+  }, [prepare, urlInput]);
+
+  const handleLogin = useCallback(async () => {
+    const serverUrl = settings?.serverUrl;
+    if (!serverUrl) return;
+    if (!email.trim() || !password) {
+      setAuthError('E-Mail und Passwort eingeben.');
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthError(null);
+    try {
+      const cookie = await loginWithPassword(
+        httpOriginFromWs(serverUrl),
+        providerId,
+        email,
+        password,
+      );
+      cookieRef.current = cookie;
+      setPassword('');
+      connectToServer(serverUrl);
+    } catch (err) {
+      setAuthError(err instanceof Error ? err.message : 'Login fehlgeschlagen.');
+    } finally {
+      setAuthBusy(false);
+    }
+  }, [connectToServer, email, password, providerId, settings]);
 
   const handleSend = useCallback(() => {
     const text = prompt.trim();
@@ -224,7 +298,7 @@ export default function App(): React.JSX.Element {
     );
   }
 
-  if (!settings) {
+  if (screen === 'url') {
     return (
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAvoidingView
@@ -239,6 +313,7 @@ export default function App(): React.JSX.Element {
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
+              keyboardType="url"
               onChangeText={(value) => {
                 setUrlInput(value);
                 if (validationError) {
@@ -255,6 +330,70 @@ export default function App(): React.JSX.Element {
             ) : null}
             <Pressable style={styles.primaryButton} onPress={() => void handleConnect()}>
               <Text style={styles.primaryButtonLabel}>Connect</Text>
+            </Pressable>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    );
+  }
+
+  if (screen === 'login') {
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.flex}
+        >
+          <View style={styles.onboarding}>
+            <Text style={styles.heroTitle}>Anmelden</Text>
+            <Text style={styles.heroText}>
+              {settings?.serverUrl ?? ''}
+            </Text>
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="username"
+              onChangeText={(value) => {
+                setEmail(value);
+                if (authError) setAuthError(null);
+              }}
+              placeholder="E-Mail"
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              value={email}
+            />
+            <TextInput
+              autoCapitalize="none"
+              autoCorrect={false}
+              secureTextEntry
+              textContentType="password"
+              onChangeText={(value) => {
+                setPassword(value);
+                if (authError) setAuthError(null);
+              }}
+              onSubmitEditing={() => void handleLogin()}
+              placeholder="Passwort"
+              placeholderTextColor={palette.muted}
+              style={styles.input}
+              value={password}
+            />
+            {authError ? <Text style={styles.errorText}>{authError}</Text> : null}
+            <Pressable
+              disabled={authBusy}
+              style={({ pressed }) => [
+                styles.primaryButton,
+                authBusy && styles.disabledButton,
+                pressed && !authBusy ? styles.primaryButtonPressed : null,
+              ]}
+              onPress={() => void handleLogin()}
+            >
+              <Text style={styles.primaryButtonLabel}>
+                {authBusy ? 'Anmelden…' : 'Sign in'}
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => setScreen('url')}>
+              <Text style={styles.linkText}>← Server ändern</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>
@@ -414,6 +553,12 @@ const styles = StyleSheet.create({
     color: palette.text,
     paddingHorizontal: 14,
     paddingVertical: 12,
+  },
+  linkText: {
+    color: palette.accent,
+    fontSize: 14,
+    paddingVertical: 8,
+    textAlign: 'center',
   },
   noticeText: {
     color: palette.muted,

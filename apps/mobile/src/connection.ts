@@ -35,9 +35,11 @@ export function createCanvasConnection(
   serverUrl: string,
   session: SessionPersistence,
   handlers: CanvasConnectionHandlers,
+  cookie?: string,
 ): CanvasConnection {
   const socket = new CanvasSocket({
     url: serverUrl,
+    ...(cookie ? { cookie } : {}),
     localOperations: [],
     session,
     createWebSocket,
