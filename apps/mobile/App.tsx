@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   type StyleProp,
@@ -21,6 +20,7 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   applyServerMessage,
   type CanvasListEntry,
@@ -551,7 +551,7 @@ export default function App(): React.JSX.Element {
         >
           <View style={styles.screen}>
             <View style={styles.header}>
-              <Text style={[containerTitle, styles.headerTitle]}>Omadia Canvas</Text>
+              <Text style={[heading, styles.headerTitle]}>Omadia Canvas</Text>
               <Text style={[mono, textTertiary, styles.statusLine]}>
                 {status.state}
                 {status.detail ? ` · ${status.detail}` : ''}
@@ -890,6 +890,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   safeArea: {
+    backgroundColor: lume.gradients.bg[1],
     flex: 1,
   },
   screen: {
