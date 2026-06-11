@@ -54,6 +54,10 @@ const palette = {
   accent: '#4f8cff',
 };
 
+/** Prefilled connection target — mirrors the desktop onboarding default and the
+ *  local test middleware (Docker omadia-test on :8080). */
+const DEFAULT_WS_URL = 'ws://127.0.0.1:8080/omadia-ui/canvas';
+
 const newTurnId = () =>
   globalThis.crypto?.randomUUID?.() ??
   `t-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -72,7 +76,7 @@ export default function App(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [booting, setBooting] = useState(true);
   const [screen, setScreen] = useState<Screen>('url');
-  const [urlInput, setUrlInput] = useState('');
+  const [urlInput, setUrlInput] = useState(DEFAULT_WS_URL);
   const [status, setStatus] = useState<ConnectionStatus>({
     state: 'disconnected',
   });
