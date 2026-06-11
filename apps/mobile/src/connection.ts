@@ -28,8 +28,15 @@ type ReactNativeWebSocketConstructor = new (
 
 const ReactNativeWebSocket = WebSocket as unknown as ReactNativeWebSocketConstructor;
 
-const createWebSocket: WebSocketFactory = (url, headers) =>
-  new ReactNativeWebSocket(url, null, headers ? { headers } : undefined) as unknown as WsLike;
+const createWebSocket: WebSocketFactory = (url, headers) => {
+  const cookieLen = headers?.Cookie?.length ?? 0;
+  console.log(`[ws] connect ${url} cookie=${cookieLen > 0 ? `yes(${cookieLen} chars)` : 'no'}`);
+  return new ReactNativeWebSocket(
+    url,
+    undefined,
+    headers ? { headers } : undefined,
+  ) as unknown as WsLike;
+};
 
 export function createCanvasConnection(
   serverUrl: string,
