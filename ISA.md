@@ -120,4 +120,4 @@ Lauffähiges Workspace-Repo `~/sources/omadia-ui-mobile`: `canvas-core` mit port
 - ISC-33: `git status --porcelain` in omadia-ui → leer
 - ISC-34: rg "npm |npx " über alle package.json/README → keine Treffer
 - ISC-35: `git worktree list` → nur main
-- KNOWN GAP (bewusst, Advisor-Option b): Runtime-Smoke-Test der App (Metro/Simulator gegen Stub-Server) steht aus — Follow-up: `bun tools/stubServer.ts` + `bunx expo start --ios`
+- Runtime-Smoke gegen ECHTE Middleware (`bun tools/smoke.ts ws://127.0.0.1:8080/omadia-ui/canvas`): canvas-core verbindet, WS-Upgrade → 401 (auth required, dokumentiertes Verhalten); `/omadia-ui/info` bestätigt protocolVersions ["1.0"] + Canvas-Endpoint → Transport + Protokollverhandlung verifiziert. Voller ready+turn via `--login` (OMADIA_USER/OMADIA_PASS aus env) — wartet auf Credentials des Users. Simulator-UI-Render weiterhin offen.
