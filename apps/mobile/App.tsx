@@ -42,7 +42,10 @@ import {
 } from '@expo-google-fonts/geist-mono';
 import { SourceSerif4_400Regular } from '@expo-google-fonts/source-serif-4';
 
-import PrimitiveNode, { type PrimitiveJson } from './src/render/PrimitiveNode';
+import PrimitiveNode, {
+  type PrimitiveAction,
+  type PrimitiveJson,
+} from './src/render/PrimitiveNode';
 import {
   AsyncSessionPersistence,
   type AppSettings,
@@ -393,20 +396,11 @@ export default function App(): React.JSX.Element {
     setPrompt('');
   }, [prompt]);
 
-  const handleAction = useCallback((node: PrimitiveJson) => {
-    const action = node.action;
-    if (
-      typeof action !== 'object' ||
-      action === null ||
-      typeof (action as { type?: unknown }).type !== 'string'
-    ) {
-      return;
-    }
-
+  const handleAction = useCallback((action: PrimitiveAction) => {
     const turn = {
       type: 'turn',
       turnId: newTurnId(),
-      action: action as ClientTurn['action'],
+      action: { type: action.type, payload: action.payload },
     } satisfies ClientTurn;
 
     connectionRef.current?.sendTurn(turn);
