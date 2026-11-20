@@ -1,6 +1,7 @@
 import React, {
   useCallback,
   useEffect,
+  useMemo,
   useReducer,
   useRef,
   useState,
@@ -47,10 +48,33 @@ import PrimitiveNode, {
   type PrimitiveJson,
 } from './src/render/PrimitiveNode';
 import {
+  AgentChoiceStorage,
   AsyncSessionPersistence,
   type AppSettings,
   SettingsStorage,
 } from './src/storage';
+import {
+  coreMessage,
+  initialAgentView,
+  reduceAgentView,
+} from './src/agents/agentView';
+import {
+  chooseAgent,
+  decideSend,
+  lockAgent,
+  registryAgentsOf,
+  resolveAgent,
+  type AgentChoices,
+} from './src/agents/agentChoice';
+import {
+  AgentBadge,
+  AgentPicker,
+  AnswerSpeaker,
+  SystemNotice,
+} from './src/agents/AgentUi';
+import type { AgentDirectoryEntry } from './src/agents/protocol';
+import { localSystemNotice } from './src/agents/speakerView';
+import { agentTexts } from './src/agents/texts';
 import {
   createCanvasConnection,
   type CanvasConnection,
@@ -165,12 +189,15 @@ export default function App(): React.JSX.Element {
     reduceCanvasState,
     initialCanvasState,
   );
+  const [agentView, dispatchAgentView] = useReducer(reduceAgentView, initialAgentView);
+  const [agentChoices, setAgentChoices] = useState<AgentChoices>({});
   const [canvases, setCanvases] = useState<CanvasListEntry[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [previewTree, setPreviewTree] = useState<unknown>(null);
   const [renderedSessionId, setRenderedSessionId] = useState<string | null>(null);
 
   const canvasStateRef = useRef(canvasState);
+  const agentChoicesHydrated = useRef(false);
   const connectionRef = useRef<CanvasConnection | null>(null);
   const sessionRef = useRef(new AsyncSessionPersistence());
   const appStateRef = useRef<AppStateStatus>(AppState.currentState);
@@ -188,6 +215,7 @@ export default function App(): React.JSX.Element {
   const openCanvas = useCallback((entry: CanvasListEntry) => {
     setActiveSessionId(entry.sessionId);
     setPreviewTree(entry.tree ?? null);
+    dispatchAgentView({ kind: 'canvas_switched' });
     connectionRef.current?.switchCanvas(entry.sessionId);
   }, []);
 
@@ -215,16 +243,26 @@ export default function App(): React.JSX.Element {
       setCanvases(message.canvases);
     }
 
-    const result = applyServerMessage(canvasStateRef.current, message);
+    // who spoke, the directory-independent part of the agent protocol (INV-3/6/7)
+    dispatchAgentView({ kind: 'message', message });
+
+    // canvas-core's store only sees what its schema knows: no speaker stamp, no
+    // text of the system speaker as prose
+    const forCanvas = coreMessage(message);
+    if (forCanvas === null) {
+      return;
+    }
+
+    const result = applyServerMessage(canvasStateRef.current, forCanvas);
     canvasStateRef.current = result.state;
-    dispatchCanvasMessage(message);
+    dispatchCanvasMessage(forCanvas);
 
     if (
-      message.type.startsWith('surface_') &&
-      'canvasSessionId' in message &&
-      typeof message.canvasSessionId === 'string'
+      forCanvas.type.startsWith('surface_') &&
+      'canvasSessionId' in forCanvas &&
+      typeof forCanvas.canvasSessionId === 'string'
     ) {
-      setRenderedSessionId(message.canvasSessionId);
+      setRenderedSessionId(forCanvas.canvasSessionId);
       if (isPrimitiveNode(result.state.tree)) {
         setPreviewTree(null);
       }
@@ -243,6 +281,9 @@ export default function App(): React.JSX.Element {
         {
           onMessage: handleMessage,
           onStatus: handleStatus,
+          onAgents: (frame) => dispatchAgentView({ kind: 'agents', frame }),
+          onServerFeatures: (features) =>
+            dispatchAgentView({ kind: 'server_features', features }),
         },
         cookieRef.current,
       ),
@@ -252,6 +293,7 @@ export default function App(): React.JSX.Element {
   const connectToServer = useCallback(
     (serverUrl: string) => {
       connectionRef.current?.close();
+      dispatchAgentView({ kind: 'connection_reset' });
       setCanvases([]);
       setActiveSessionId(null);
       setPreviewTree(null);
@@ -294,11 +336,15 @@ export default function App(): React.JSX.Element {
     const boot = async () => {
       const session = sessionRef.current;
       await session.hydrate();
+      const storedChoices = await AgentChoiceStorage.load();
       const loadedSettings = await SettingsStorage.load();
 
       if (!mounted) {
         return;
       }
+
+      setAgentChoices((current) => ({ ...storedChoices, ...current }));
+      agentChoicesHydrated.current = true;
 
       if (loadedSettings) {
         setSettings(loadedSettings);
@@ -380,6 +426,71 @@ export default function App(): React.JSX.Element {
     }
   }, [connectToServer, email, password, providerId, settings]);
 
+  // ── agents (spec 2042 §5.3) ──────────────────────────────────────────────
+  // The agent of a canvas is chosen by the user and fixed once its first turn
+  // is sent: every turn carries it (`metadata.agentId`), the server refuses a
+  // turn without one and never picks another. What the client preselects is
+  // only what the server names (default agent) or the one agent there is.
+  const texts = useMemo(() => agentTexts(), []);
+  const serverUrl = settings?.serverUrl;
+  const agentsActive = agentView.serverSupportsAgents !== false;
+  const canvasKey = status.canvasSessionId ?? activeSessionId;
+  const registryAgents = useMemo(() => registryAgentsOf(canvases), [canvases]);
+  const resolvedAgent = resolveAgent(
+    agentChoices,
+    registryAgents,
+    canvasKey,
+    agentView.agents,
+    agentView.defaultSlug,
+  );
+  const agentEntry = agentView.agents.find((a) => a.id === resolvedAgent.agentId);
+  const noAgent = agentsActive && resolvedAgent.agentId === undefined;
+
+  useEffect(() => {
+    if (agentChoicesHydrated.current) {
+      void AgentChoiceStorage.save(agentChoices);
+    }
+  }, [agentChoices]);
+
+  // a canvas that has not had its first turn asks who is available whenever it
+  // is shown (the directory can change while the app runs)
+  useEffect(() => {
+    if (status.state === 'ready' && agentsActive && !resolvedAgent.locked) {
+      connectionRef.current?.requestAgents();
+    }
+  }, [status.state, canvasKey, agentsActive, resolvedAgent.locked]);
+
+  const handlePickAgent = useCallback(
+    (agent: AgentDirectoryEntry) => {
+      if (canvasKey !== null) {
+        setAgentChoices((current) => chooseAgent(current, canvasKey, agent.id));
+      }
+    },
+    [canvasKey],
+  );
+
+  /** Send a turn to the agent of this canvas. False: not sent (no agent chosen). */
+  const sendAgentTurn = useCallback(
+    (turn: ClientTurn): boolean => {
+      const decision = decideSend(agentView.serverSupportsAgents, resolvedAgent.agentId);
+      if (!decision.send) {
+        dispatchAgentView({
+          kind: 'notice',
+          notice: localSystemNotice(decision.reason, texts.noAgentNotice),
+        });
+        return false;
+      }
+      connectionRef.current?.sendTurn(turn, decision.agentId);
+      dispatchAgentView({ kind: 'turn_started' });
+      const { agentId } = decision;
+      if (agentId !== undefined && canvasKey !== null) {
+        setAgentChoices((current) => lockAgent(current, canvasKey, agentId));
+      }
+      return true;
+    },
+    [agentView.serverSupportsAgents, canvasKey, resolvedAgent.agentId, texts],
+  );
+
   const handleSend = useCallback(() => {
     const text = prompt.trim();
     if (!text) {
@@ -392,19 +503,23 @@ export default function App(): React.JSX.Element {
       text,
     } satisfies ClientTurn;
 
-    connectionRef.current?.sendTurn(turn);
-    setPrompt('');
-  }, [prompt]);
+    if (sendAgentTurn(turn)) {
+      setPrompt('');
+    }
+  }, [prompt, sendAgentTurn]);
 
-  const handleAction = useCallback((action: PrimitiveAction) => {
-    const turn = {
-      type: 'turn',
-      turnId: newTurnId(),
-      action: { type: action.type, payload: action.payload },
-    } satisfies ClientTurn;
+  const handleAction = useCallback(
+    (action: PrimitiveAction) => {
+      const turn = {
+        type: 'turn',
+        turnId: newTurnId(),
+        action: { type: action.type, payload: action.payload },
+      } satisfies ClientTurn;
 
-    connectionRef.current?.sendTurn(turn);
-  }, []);
+      sendAgentTurn(turn);
+    },
+    [sendAgentTurn],
+  );
 
   if (booting || !fontsLoaded) {
     return (
@@ -529,6 +644,14 @@ export default function App(): React.JSX.Element {
     );
   }
 
+  const composerPlaceholder = !agentsActive
+    ? 'Describe the next change...'
+    : agentEntry
+      ? texts.composerPlaceholder(agentEntry.displayName)
+      : resolvedAgent.agentId !== undefined
+        ? texts.composerPlaceholderUnlisted
+        : texts.composerPlaceholder(undefined);
+
   const liveTree =
     activeSessionId !== null &&
     renderedSessionId === activeSessionId &&
@@ -550,7 +673,7 @@ export default function App(): React.JSX.Element {
                 {status.state}
                 {status.detail ? ` · ${status.detail}` : ''}
               </Text>
-              {canvasState.turnError ? (
+              {canvasState.turnError && agentView.systemNotice === null ? (
                 <Text style={styles.errorText}>{canvasState.turnError}</Text>
               ) : null}
               {canvasState.notices.length > 0 ? (
@@ -610,11 +733,38 @@ export default function App(): React.JSX.Element {
               </ScrollView>
             ) : null}
 
+            {agentsActive ? (
+              resolvedAgent.locked ? (
+                <View style={styles.agentBar}>
+                  <AgentBadge
+                    avatarUrl={agentEntry?.avatarUrl}
+                    displayName={agentEntry?.displayName ?? texts.agentFallbackName}
+                    serverUrl={serverUrl}
+                    size="md"
+                  />
+                </View>
+              ) : (
+                <AgentPicker
+                  agents={agentView.agents}
+                  loaded={agentView.agentsLoaded}
+                  onSelect={handlePickAgent}
+                  selectedId={resolvedAgent.agentId}
+                  serverUrl={serverUrl}
+                  texts={texts}
+                />
+              )
+            ) : null}
+
             <ScrollView
               contentContainerStyle={styles.canvasContent}
               keyboardShouldPersistTaps="handled"
               style={styles.canvasScroll}
             >
+              <AnswerSpeaker
+                serverUrl={serverUrl}
+                speaker={agentView.speaker}
+                texts={texts}
+              />
               {liveTree ? (
                 <PrimitiveNode node={liveTree} onAction={handleAction} />
               ) : isPrimitiveNode(previewTree) ? (
@@ -637,18 +787,29 @@ export default function App(): React.JSX.Element {
               ) : null}
             </ScrollView>
 
+            {agentView.systemNotice ? (
+              <View style={styles.noticeSlot}>
+                <SystemNotice
+                  notice={agentView.systemNotice}
+                  onDismiss={() => dispatchAgentView({ kind: 'notice', notice: null })}
+                  texts={texts}
+                />
+              </View>
+            ) : null}
+
             <View style={styles.composer}>
               <TextInput
                 autoCapitalize="sentences"
+                editable={!noAgent}
                 multiline
                 onChangeText={setPrompt}
-                placeholder="Describe the next change..."
+                placeholder={composerPlaceholder}
                 placeholderTextColor={lume.colors.textTertiary}
                 style={styles.composerInput}
                 value={prompt}
               />
               <PrimaryButton
-                disabled={!prompt.trim() || status.state !== 'ready'}
+                disabled={!prompt.trim() || status.state !== 'ready' || noAgent}
                 label={canvasState.turnPending ? 'Sending…' : 'Send'}
                 onPress={handleSend}
                 style={styles.composerButton}
@@ -662,6 +823,12 @@ export default function App(): React.JSX.Element {
 }
 
 const styles = StyleSheet.create({
+  agentBar: {
+    borderBottomColor: lume.colors.borderSubtleBtm,
+    borderBottomWidth: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
   bootText: {
     fontSize: 16,
   },
@@ -815,6 +982,10 @@ const styles = StyleSheet.create({
   },
   linkTextPressed: {
     color: lume.colors.accent,
+  },
+  noticeSlot: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
   },
   noticeText: {
     fontSize: 13,

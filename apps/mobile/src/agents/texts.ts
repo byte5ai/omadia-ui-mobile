@@ -16,6 +16,9 @@ export interface AgentTexts {
   systemNotice: string;
   dismiss: string;
   composerPlaceholder: (name: string | undefined) => string;
+  /** the chosen agent is not (or no longer) in the directory */
+  composerPlaceholderUnlisted: string;
+  agentFallbackName: string;
   noAgentNotice: string;
 }
 
@@ -28,6 +31,8 @@ const de: AgentTexts = {
   systemNotice: 'Systemhinweis',
   dismiss: 'Hinweis schließen',
   composerPlaceholder: (name) => (name ? `Frag ${name} …` : 'Wähle zuerst einen Agenten'),
+  composerPlaceholderUnlisted: 'Frag den Agenten …',
+  agentFallbackName: 'Agent',
   noAgentNotice: 'Wähle zuerst einen Agenten für dieses Gespräch.',
 };
 
@@ -40,6 +45,8 @@ const en: AgentTexts = {
   systemNotice: 'System notice',
   dismiss: 'Dismiss notice',
   composerPlaceholder: (name) => (name ? `Ask ${name} …` : 'Choose an agent first'),
+  composerPlaceholderUnlisted: 'Ask the agent …',
+  agentFallbackName: 'Agent',
   noAgentNotice: 'Choose an agent for this conversation first.',
 };
 
