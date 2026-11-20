@@ -64,6 +64,34 @@ with `OMADIA_REPO`). Run the sync manually with `bun run sync`; `test` and
 `typecheck` run it automatically. This is the same no-drift mechanism the
 other protocol consumers use — one schema, one source of truth.
 
+## Agents
+
+The app speaks the same agent protocol as the omadia-ui desktop host
+(omadia-canvas-protocol/1.1, additive; spec 2042 §5.3, §5.14):
+
+- **One agent per conversation.** Each canvas has an agent the user chooses
+  before its first turn; it is fixed after that. The default agent the server
+  names, or the only agent there is, is preselected (visibly); with several
+  agents and no default nothing is sent until the user chooses. The client
+  never picks one itself.
+- **`agentId` in every turn** (`metadata.agentId` on the server). The server
+  refuses a turn without one (`no_agent`).
+- **Speaker on every message.** Agent messages show name and avatar; a refused
+  or failed turn (`turn_error.systemNotice`) is a `system` notice, set apart,
+  without avatar. Unknown notice codes render through their `text`.
+- **Directory.** The `agents` message after the handshake (and the answer to
+  `agents_get`); the kernel's `GET /api/v1/agents/directory?channel=web` has
+  the same shape (`default_agent`).
+
+The code lives in `apps/mobile/src/agents/`. `@omadia/canvas-core` does not
+carry these fields yet, so `wireTap.ts` wraps the socket: it declares
+`clientFeatures: ['agents']` and the UI `locale` in `handshake_select`, hands
+the `agents` frame (which canvas-core drops) to the app and sends `agents_get`.
+A server that does not announce the `agents` feature is served as before: no
+picker, no `agentId`. Requires the kernel's agent-aware canvas channel
+(`@omadia/ui-channel` with agent selection); the user-facing words are in
+`texts.ts` (de/en).
+
 ## The App Store invariant
 
 > **Apple App Store Guideline 2.5.2.** The protocol delivers *declarative UI
