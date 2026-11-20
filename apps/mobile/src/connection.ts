@@ -7,15 +7,26 @@ import {
   type WebSocketFactory,
   type WsLike,
 } from '@omadia/canvas-core';
+import type { AgentsFrame, AgentTurn } from './agents/protocol';
+import { uiLocale } from './agents/texts';
+import { requestAgentsOn, tapSocket, type WireTapHandlers } from './agents/wireTap';
 
 export interface CanvasConnectionHandlers {
   onMessage: (msg: ServerMessage) => void;
   onStatus: (status: ConnectionStatus) => void;
+  /** the agent directory (`agents` frame) — canvas-core drops it, see wireTap.ts */
+  onAgents?: (frame: AgentsFrame) => void;
+  /** `serverFeatures` of the offer: does this server speak the agent protocol? */
+  onServerFeatures?: (features: readonly string[]) => void;
 }
 
 export interface CanvasConnection {
   connect(): void;
-  sendTurn(turn: ClientTurn): void;
+  /** `agentId` names the agent of the canvas (`metadata.agentId`); omitted only
+   *  for a server that does not speak the agent protocol. */
+  sendTurn(turn: ClientTurn, agentId?: string): void;
+  /** ask the server for the agent directory again; false when not connected */
+  requestAgents(): boolean;
   requestCanvasList(): void;
   resync(): void;
   switchCanvas(sessionId: string): void;
@@ -30,7 +41,7 @@ type ReactNativeWebSocketConstructor = new (
 
 const ReactNativeWebSocket = WebSocket as unknown as ReactNativeWebSocketConstructor;
 
-const createWebSocket: WebSocketFactory = (url, headers) => {
+const platformWebSocket: WebSocketFactory = (url, headers) => {
   // React Native attaches the `omadia_session` cookie automatically from the
   // native cookie store (populated by the login fetch) on both iOS and Android.
   // Passing an explicit `Cookie` header here in ADDITION duplicates it, yielding
@@ -47,6 +58,17 @@ export function createCanvasConnection(
   handlers: CanvasConnectionHandlers,
   cookie?: string,
 ): CanvasConnection {
+  const tap: WireTapHandlers = {
+    onAgents: (frame) => handlers.onAgents?.(frame),
+    onServerFeatures: (features) => handlers.onServerFeatures?.(features),
+  };
+  const locale = uiLocale();
+  let currentWs: WsLike | null = null;
+  const createWebSocket: WebSocketFactory = (url, headers) => {
+    currentWs = tapSocket(platformWebSocket(url, headers), { locale, handlers: tap });
+    return currentWs;
+  };
+
   const socket = new CanvasSocket({
     url: serverUrl,
     ...(cookie ? { cookie } : {}),
@@ -61,8 +83,12 @@ export function createCanvasConnection(
     connect() {
       socket.connect();
     },
-    sendTurn(turn: ClientTurn) {
-      socket.sendTurn(turn);
+    sendTurn(turn: ClientTurn, agentId?: string) {
+      const named: AgentTurn = agentId ? { ...turn, agentId } : turn;
+      socket.sendTurn(named);
+    },
+    requestAgents() {
+      return requestAgentsOn(currentWs);
     },
     requestCanvasList() {
       socket.requestCanvasList();
