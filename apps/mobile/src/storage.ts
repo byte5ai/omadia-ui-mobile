@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { SessionPersistence } from '@omadia/canvas-core';
+import { parseAgentChoices, type AgentChoices } from './agents/agentChoice';
 
 const SERVER_URL_KEY = 'omadia.serverUrl';
 const SESSION_ID_KEY = 'omadia.canvasSessionId';
+const AGENT_CHOICES_KEY = 'omadia.canvasAgents';
 
 export interface AppSettings {
   serverUrl: string;
@@ -52,3 +54,24 @@ export class AsyncSessionPersistence implements SessionPersistence {
     });
   }
 }
+
+/** The agent chosen per canvas (spec 2042 §5.3), kept across app restarts. */
+export const AgentChoiceStorage = {
+  async load(): Promise<AgentChoices> {
+    try {
+      const stored = await AsyncStorage.getItem(AGENT_CHOICES_KEY);
+      return stored ? parseAgentChoices(JSON.parse(stored)) : {};
+    } catch (error) {
+      console.warn('Failed to load agent choices', error);
+      return {};
+    }
+  },
+
+  async save(choices: AgentChoices): Promise<void> {
+    try {
+      await AsyncStorage.setItem(AGENT_CHOICES_KEY, JSON.stringify(choices));
+    } catch (error) {
+      console.warn('Failed to save agent choices', error);
+    }
+  },
+};
