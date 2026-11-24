@@ -7,7 +7,7 @@ validators.generated.mjs
 ios/build/
 android/build/
 
-# synced from the canonical @omadia/canvas-core (omadia monorepo) — see scripts/sync-canvas-core.mjs
+# synced from the canonical @omadia/canvas-core (byte5ai/omadia-ui-support) — see scripts/sync-canvas-core.mjs
 packages/canvas-core/src/
 packages/canvas-core/schema/
 packages/canvas-core/test/
