@@ -124,10 +124,11 @@ function reduceMessage(state: AgentView, message: ServerMessage): AgentView {
  * stamping the server adds to every answer frame; the surface-event schema
  * does not list it and would reject the event, so it is taken off. The text of
  * the `system` speaker is not agent prose and never reaches the prose of the
- * canvas (`null`: do not apply).
+ * canvas (`null`: do not apply); neither does a retract in its name, which
+ * would otherwise trim the agent's prose.
  */
 export function coreMessage(message: ServerMessage): ServerMessage | null {
-  if (message.type === 'agent_text_delta') {
+  if (message.type === 'agent_text_delta' || message.type === 'agent_text_retract') {
     return speakerView((message as Stamped).speaker)?.kind === 'system' ? null : message;
   }
   if (message.type.startsWith('surface_') && 'speaker' in message) {
