@@ -163,6 +163,26 @@ describe('coreMessage — what canvas-core may see', () => {
     expect(coreMessage(delta)).toBe(delta);
   });
 
+  it('takes back streamed prose on an agent retract: deltas, retract over all, done → empty', () => {
+    const frames = [
+      { type: 'agent_text_delta', forTurn: 't', text: 'Draft ', speaker: MIRA },
+      { type: 'agent_text_delta', forTurn: 't', text: 'über Anna', speaker: MIRA },
+      { type: 'agent_text_retract', forTurn: 't', chars: 'Draft über Anna'.length, speaker: MIRA },
+      { type: 'turn_complete', forTurn: 't', speaker: MIRA },
+    ] as unknown as ServerMessage[];
+    const state = frames.reduce((s, f) => {
+      const core = coreMessage(f);
+      return core === null ? s : applyServerMessage(s, core).state;
+    }, initialCanvasState);
+    expect(state.prose).toBe('');
+    expect(state.prose).not.toContain('Draft');
+  });
+
+  it('a retract in the name of the system speaker leaves the agent prose alone', () => {
+    const retract = { type: 'agent_text_retract', forTurn: 't', chars: 3, speaker: { kind: 'system' } } as unknown as ServerMessage;
+    expect(coreMessage(retract)).toBeNull();
+  });
+
   it('keeps the words of the system speaker out of the prose of the canvas', () => {
     const delta = { type: 'agent_text_delta', forTurn: 't', text: 'x', speaker: { kind: 'system' } } as unknown as ServerMessage;
     expect(coreMessage(delta)).toBeNull();

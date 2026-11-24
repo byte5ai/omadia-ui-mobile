@@ -1,10 +1,12 @@
-// Sync the canonical @omadia/canvas-core sources from the omadia monorepo into
+// Sync the canonical @omadia/canvas-core sources from omadia-ui-support into
 // this repo's packages/canvas-core. No vendored/committed copy => no drift: the
 // protocol core (src), schemas, tests, and fixtures are fetched from the single
 // source of truth at install/test time and are gitignored here.
 //
-// Source: the omadia monorepo's canvas-core package. Override the repo path
-// with OMADIA_REPO (default: ../omadia sibling checkout).
+// Source: packages/canvas-core of byte5ai/omadia-ui-support, where the package
+// lives since canvas-core 0.3.0 (it left the omadia monorepo,
+// middleware/packages/canvas-core). Override the repo path with
+// OMADIA_UI_SUPPORT_REPO (default: ../omadia-ui-support sibling checkout).
 //
 // Mirrored exactly (local dir is replaced): src/ (minus the middleware plugin
 // entry), schema/, test/, fixtures/. Copied without deleting local extras:
@@ -15,14 +17,14 @@ import { dirname, join, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..');
-const omadiaRepo = resolve(repoRoot, process.env.OMADIA_REPO ?? '../omadia');
-const src = join(omadiaRepo, 'middleware/packages/canvas-core');
+const supportRepo = resolve(repoRoot, process.env.OMADIA_UI_SUPPORT_REPO ?? '../omadia-ui-support');
+const src = join(supportRepo, 'packages/canvas-core');
 const dest = join(repoRoot, 'packages/canvas-core');
 
 if (!existsSync(src)) {
   console.error(
     `sync-canvas-core: canonical package not found at ${src}\n` +
-      'Clone https://github.com/byte5ai/omadia as a sibling checkout, or set OMADIA_REPO.',
+      'Clone https://github.com/byte5ai/omadia-ui-support as a sibling checkout, or set OMADIA_UI_SUPPORT_REPO.',
   );
   process.exit(1);
 }
